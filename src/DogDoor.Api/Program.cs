@@ -20,7 +20,7 @@ builder.Services.AddScoped<IDoorService, DoorService>();
 // Controllers
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// builder.Services.AddSwaggerGen(); // Temporarily disabled for .NET 10 compatibility
 
 // CORS
 builder.Services.AddCors(options =>
@@ -37,8 +37,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    // app.UseSwagger(); // Temporarily disabled for .NET 10 compatibility
+    // app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
