@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dog-door
+description: Smart Dog Door - ESP32-CAM edge AI dog detection with .NET API and React admin SPA
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

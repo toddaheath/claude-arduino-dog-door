@@ -1,0 +1,64 @@
+# Smart Dog Door Helm Chart Values
+
+api:
+  image:
+    repository: dogdoor/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 5000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+web:
+  image:
+    repository: dogdoor/web
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+postgres:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  port: 5432
+  storage:
+    size: 5Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  enabled: false
+  className: nginx
+  host: dogdoor.local
+  tls:
+    enabled: false
+    secretName: dogdoor-tls
+
+config:
+  aspnetcoreEnvironment: Production
+  photoStoragePath: /app/uploads
+
+secret:
+  postgresUser: dogdoor
+  postgresPassword: dogdoor
+  postgresDb: dogdoor

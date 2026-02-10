@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dogdoor
+      POSTGRES_USER: dogdoor
+      POSTGRES_PASSWORD: dogdoor
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dogdoor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./src
+      dockerfile: DogDoor.Api/Dockerfile
+    ports:
+      - "5001:5000"
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=dogdoor;Username=dogdoor;Password=dogdoor"
+      ASPNETCORE_ENVIRONMENT: Development
+      PhotoStorage__BasePath: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  uploads:

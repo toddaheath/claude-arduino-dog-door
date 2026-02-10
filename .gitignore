@@ -1,0 +1,56 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.pdb
+*.exe
+*.nupkg
+project.lock.json
+TestResults/
+
+# Node / React
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+appsettings.Local.json
+
+# Docker
+docker-compose.override.yml
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# Photo uploads
+uploads/
+
+# Logs
+logs/
+*.log

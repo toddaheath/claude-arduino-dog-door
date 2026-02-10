@@ -1,0 +1,34 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace DogDoor.Api.Models;
+
+public enum DoorEventType
+{
+    AccessGranted,
+    AccessDenied,
+    DoorOpened,
+    DoorClosed,
+    UnknownAnimal,
+    ManualOverride
+}
+
+public class DoorEvent
+{
+    public int Id { get; set; }
+
+    public int? AnimalId { get; set; }
+
+    public DoorEventType EventType { get; set; }
+
+    [MaxLength(500)]
+    public string? ImagePath { get; set; }
+
+    public double? ConfidenceScore { get; set; }
+
+    [MaxLength(500)]
+    public string? Notes { get; set; }
+
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    public Animal? Animal { get; set; }
+}
