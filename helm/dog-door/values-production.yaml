@@ -1,0 +1,31 @@
+# Production environment overrides
+
+api:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+web:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+ingress:
+  enabled: true
+  host: dogdoor.example.com
+  tls:
+    enabled: true
+    secretName: dogdoor-tls
+
+config:
+  aspnetcoreEnvironment: Production

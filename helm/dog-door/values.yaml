@@ -2,7 +2,7 @@
 
 api:
   image:
-    repository: dogdoor/api
+    repository: ghcr.io/toddaheath/dogdoor-api
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -17,7 +17,7 @@ api:
 
 web:
   image:
-    repository: dogdoor/web
+    repository: ghcr.io/toddaheath/dogdoor-web
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
