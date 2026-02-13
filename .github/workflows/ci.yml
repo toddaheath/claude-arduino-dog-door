@@ -81,7 +81,7 @@ jobs:
         run: pip install platformio
 
       - name: Compile firmware
-        run: pio run -d firmware
+        run: pio run -d firmware -e esp32cam
 
       - name: Run unit tests
         run: pio test -d firmware -e native
