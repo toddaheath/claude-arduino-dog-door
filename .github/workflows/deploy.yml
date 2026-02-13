@@ -1,0 +1,54 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: "Image tag to deploy (e.g. 1.0.0)"
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install dog-door helm/dog-door \
+            --namespace dog-door-${{ inputs.environment }} \
+            --create-namespace \
+            --values helm/dog-door/values-${{ inputs.environment }}.yaml \
+            --set api.image.repository=${{ env.REGISTRY }}/${{ github.repository_owner }}/dogdoor-api \
+            --set api.image.tag=${{ inputs.image_tag }} \
+            --set web.image.repository=${{ env.REGISTRY }}/${{ github.repository_owner }}/dogdoor-web \
+            --set web.image.tag=${{ inputs.image_tag }} \
+            --wait \
+            --timeout 5m
+
+      - name: Verify deployment
+        run: |
+          helm status dog-door --namespace dog-door-${{ inputs.environment }}
+          kubectl get pods --namespace dog-door-${{ inputs.environment }}

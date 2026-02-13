@@ -1,0 +1,14 @@
+# Staging environment overrides
+
+api:
+  replicas: 1
+
+web:
+  replicas: 1
+
+ingress:
+  enabled: true
+  host: dogdoor-staging.example.com
+
+config:
+  aspnetcoreEnvironment: Staging
