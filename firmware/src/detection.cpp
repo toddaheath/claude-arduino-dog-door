@@ -6,6 +6,7 @@
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/micro/micro_error_reporter.h"
 
 // Model data (placeholder - replace with trained model)
 #include "../model/dog_detect_model.h"
@@ -43,8 +44,9 @@ bool detection_init() {
     }
 
     // Build the interpreter
+    static tflite::MicroErrorReporter micro_error_reporter;
     static tflite::MicroInterpreter static_interpreter(
-        model, resolver, tensor_arena, kTensorArenaSize);
+        model, resolver, tensor_arena, kTensorArenaSize, &micro_error_reporter);
     interpreter = &static_interpreter;
 
     TfLiteStatus allocate_status = interpreter->AllocateTensors();
