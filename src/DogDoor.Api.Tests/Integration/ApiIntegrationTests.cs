@@ -16,11 +16,14 @@ public class CustomWebAppFactory : WebApplicationFactory<Program>
     {
         builder.ConfigureServices(services =>
         {
-            // Remove existing DbContext registration
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<DogDoorDbContext>));
-            if (descriptor != null)
-                services.Remove(descriptor);
+            // Remove all DbContext-related registrations to avoid multiple provider conflict
+            var descriptorsToRemove = services
+                .Where(d => d.ServiceType == typeof(DbContextOptions<DogDoorDbContext>)
+                         || d.ServiceType == typeof(DbContextOptions)
+                         || d.ServiceType.FullName?.Contains("EntityFrameworkCore") == true)
+                .ToList();
+            foreach (var d in descriptorsToRemove)
+                services.Remove(d);
 
             // Use in-memory database for tests
             services.AddDbContext<DogDoorDbContext>(options =>
