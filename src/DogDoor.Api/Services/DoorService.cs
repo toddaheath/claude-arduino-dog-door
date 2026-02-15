@@ -28,21 +28,38 @@ public class DoorService : IDoorService
         _config = config;
     }
 
-    public async Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey)
+    public async Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey, string? side = null)
     {
+        // Determine side and direction from the requesting camera
+        DoorSide? doorSide = side?.ToLowerInvariant() switch
+        {
+            "inside" => DoorSide.Inside,
+            "outside" => DoorSide.Outside,
+            _ => null
+        };
+
+        TransitDirection? direction = doorSide switch
+        {
+            DoorSide.Inside => TransitDirection.Exiting,
+            DoorSide.Outside => TransitDirection.Entering,
+            _ => null
+        };
+
+        string? directionString = direction?.ToString();
+
         var doorConfig = await _db.DoorConfigurations.FirstOrDefaultAsync();
 
         // Validate API key if configured
         if (doorConfig?.ApiKey is not null && doorConfig.ApiKey != apiKey)
         {
-            return new AccessResponseDto(false, null, null, null, "Invalid API key");
+            return new AccessResponseDto(false, null, null, null, "Invalid API key", directionString);
         }
 
         // Check if door is enabled
         if (doorConfig is not null && !doorConfig.IsEnabled)
         {
-            await LogEventAsync(null, DoorEventType.AccessDenied, null, 0, "Door is disabled");
-            return new AccessResponseDto(false, null, null, null, "Door is disabled");
+            await LogEventAsync(null, DoorEventType.AccessDenied, null, 0, "Door is disabled", doorSide, direction);
+            return new AccessResponseDto(false, null, null, null, "Door is disabled", directionString);
         }
 
         // Check night mode
@@ -55,8 +72,8 @@ public class DoorService : IDoorService
 
             if (isNightTime)
             {
-                await LogEventAsync(null, DoorEventType.AccessDenied, null, 0, "Night mode active");
-                return new AccessResponseDto(false, null, null, null, "Night mode active");
+                await LogEventAsync(null, DoorEventType.AccessDenied, null, 0, "Night mode active", doorSide, direction);
+                return new AccessResponseDto(false, null, null, null, "Night mode active", directionString);
             }
         }
 
@@ -83,16 +100,28 @@ public class DoorService : IDoorService
             var animal = await _db.Animals.FindAsync(result.AnimalId.Value);
             if (animal is not null && animal.IsAllowed)
             {
-                await LogEventAsync(animal.Id, DoorEventType.AccessGranted, imagePath, result.Confidence, null);
-                return new AccessResponseDto(true, animal.Id, animal.Name, result.Confidence, null);
+                var grantedType = direction switch
+                {
+                    TransitDirection.Exiting => DoorEventType.ExitGranted,
+                    TransitDirection.Entering => DoorEventType.EntryGranted,
+                    _ => DoorEventType.AccessGranted
+                };
+                await LogEventAsync(animal.Id, grantedType, imagePath, result.Confidence, null, doorSide, direction);
+                return new AccessResponseDto(true, animal.Id, animal.Name, result.Confidence, null, directionString);
             }
 
-            await LogEventAsync(result.AnimalId, DoorEventType.AccessDenied, imagePath, result.Confidence, "Animal not allowed");
-            return new AccessResponseDto(false, result.AnimalId, result.AnimalName, result.Confidence, "Animal not allowed");
+            var deniedType = direction switch
+            {
+                TransitDirection.Exiting => DoorEventType.ExitDenied,
+                TransitDirection.Entering => DoorEventType.EntryDenied,
+                _ => DoorEventType.AccessDenied
+            };
+            await LogEventAsync(result.AnimalId, deniedType, imagePath, result.Confidence, "Animal not allowed", doorSide, direction);
+            return new AccessResponseDto(false, result.AnimalId, result.AnimalName, result.Confidence, "Animal not allowed", directionString);
         }
 
-        await LogEventAsync(null, DoorEventType.UnknownAnimal, imagePath, result.Confidence, "Animal not recognized");
-        return new AccessResponseDto(false, null, null, result.Confidence, "Animal not recognized");
+        await LogEventAsync(null, DoorEventType.UnknownAnimal, imagePath, result.Confidence, "Animal not recognized", doorSide, direction);
+        return new AccessResponseDto(false, null, null, result.Confidence, "Animal not recognized", directionString);
     }
 
     public async Task<DoorConfigurationDto> GetConfigurationAsync()
@@ -131,7 +160,7 @@ public class DoorService : IDoorService
         return _mapper.Map<DoorConfigurationDto>(config);
     }
 
-    public async Task<IEnumerable<DoorEventDto>> GetAccessLogsAsync(int page, int pageSize, string? eventType)
+    public async Task<IEnumerable<DoorEventDto>> GetAccessLogsAsync(int page, int pageSize, string? eventType, string? direction = null)
     {
         var query = _db.DoorEvents
             .Include(e => e.Animal)
@@ -140,6 +169,11 @@ public class DoorService : IDoorService
         if (eventType is not null && Enum.TryParse<DoorEventType>(eventType, true, out var parsedType))
         {
             query = query.Where(e => e.EventType == parsedType);
+        }
+
+        if (direction is not null && Enum.TryParse<TransitDirection>(direction, true, out var parsedDirection))
+        {
+            query = query.Where(e => e.Direction == parsedDirection);
         }
 
         var events = await query
@@ -160,7 +194,7 @@ public class DoorService : IDoorService
         return doorEvent is null ? null : _mapper.Map<DoorEventDto>(doorEvent);
     }
 
-    private async Task LogEventAsync(int? animalId, DoorEventType eventType, string? imagePath, double? confidence, string? notes)
+    private async Task LogEventAsync(int? animalId, DoorEventType eventType, string? imagePath, double? confidence, string? notes, DoorSide? side = null, TransitDirection? direction = null)
     {
         var doorEvent = new DoorEvent
         {
@@ -168,7 +202,9 @@ public class DoorService : IDoorService
             EventType = eventType,
             ImagePath = imagePath,
             ConfidenceScore = confidence,
-            Notes = notes
+            Notes = notes,
+            Side = side,
+            Direction = direction
         };
 
         _db.DoorEvents.Add(doorEvent);

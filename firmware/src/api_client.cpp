@@ -3,8 +3,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-AccessResponse api_request_access(camera_fb_t* fb) {
-    AccessResponse response = {false, -1, "", 0.0f, "", false};
+AccessResponse api_request_access(camera_fb_t* fb, const char* side) {
+    AccessResponse response = {false, -1, "", 0.0f, "", "", false};
 
     if (!fb || !fb->buf || fb->len == 0) {
         response.reason = "Invalid frame buffer";
@@ -34,10 +34,17 @@ AccessResponse api_request_access(camera_fb_t* fb) {
         apiKeyPart += String(API_KEY);
     }
 
+    String sidePart = "";
+    if (side && strlen(side) > 0) {
+        sidePart = "\r\n--" + boundary + "\r\n";
+        sidePart += "Content-Disposition: form-data; name=\"side\"\r\n\r\n";
+        sidePart += String(side);
+    }
+
     String bodyEnd = "\r\n--" + boundary + "--\r\n";
 
     // Calculate total content length
-    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + bodyEnd.length();
+    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + sidePart.length() + bodyEnd.length();
 
     // Allocate buffer for the entire request body
     uint8_t* body = (uint8_t*)malloc(totalLen);
@@ -54,6 +61,10 @@ AccessResponse api_request_access(camera_fb_t* fb) {
     if (apiKeyPart.length() > 0) {
         memcpy(body + offset, apiKeyPart.c_str(), apiKeyPart.length());
         offset += apiKeyPart.length();
+    }
+    if (sidePart.length() > 0) {
+        memcpy(body + offset, sidePart.c_str(), sidePart.length());
+        offset += sidePart.length();
     }
     memcpy(body + offset, bodyEnd.c_str(), bodyEnd.length());
 
@@ -74,11 +85,12 @@ AccessResponse api_request_access(camera_fb_t* fb) {
             response.animalName = doc["animalName"].as<String>();
             response.confidenceScore = doc["confidenceScore"] | 0.0f;
             response.reason = doc["reason"].as<String>();
+            response.direction = doc["direction"].as<String>();
             response.success = true;
 
-            Serial.printf("API response: allowed=%d, animal=%s, confidence=%.2f\n",
+            Serial.printf("API response: allowed=%d, animal=%s, confidence=%.2f, direction=%s\n",
                          response.allowed, response.animalName.c_str(),
-                         response.confidenceScore);
+                         response.confidenceScore, response.direction.c_str());
         } else {
             response.reason = "JSON parse error: " + String(err.c_str());
             Serial.println(response.reason);

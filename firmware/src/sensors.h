@@ -1,6 +1,9 @@
 #ifndef SENSORS_H
 #define SENSORS_H
 
+// Dual-board architecture: each ESP32-CAM board runs its own set of sensors.
+// The board's THIS_SIDE config determines which side of the door it monitors.
+
 #include <Arduino.h>
 
 void sensors_init();

@@ -9,5 +9,7 @@ public record DoorEventDto(
     DoorEventType EventType,
     double? ConfidenceScore,
     string? Notes,
-    DateTime Timestamp
+    DateTime Timestamp,
+    string? Side,
+    string? Direction
 );

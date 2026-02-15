@@ -1,6 +1,17 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// ===== Door Side Configuration =====
+// Dual-board architecture: two ESP32-CAMs, one per side of the door.
+// Set THIS_SIDE to the side this board is mounted on.
+// Inside camera detects dogs exiting; outside camera detects dogs entering.
+#define SIDE_INSIDE  "inside"
+#define SIDE_OUTSIDE "outside"
+
+#ifndef THIS_SIDE
+#define THIS_SIDE SIDE_INSIDE  // Default; override with -DTHIS_SIDE=SIDE_OUTSIDE
+#endif
+
 // ===== WiFi Configuration =====
 #define WIFI_SSID "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"

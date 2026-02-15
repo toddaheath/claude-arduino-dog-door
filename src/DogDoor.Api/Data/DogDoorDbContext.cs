@@ -37,6 +37,7 @@ public class DogDoorDbContext : DbContext
         {
             entity.HasIndex(e => e.Timestamp);
             entity.HasIndex(e => e.EventType);
+            entity.HasIndex(e => e.Direction);
         });
 
         // Seed default configuration

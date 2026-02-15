@@ -1,7 +1,8 @@
 namespace DogDoor.Api.DTOs;
 
 public record AccessRequestDto(
-    string? ApiKey
+    string? ApiKey,
+    string? Side
 );
 
 public record AccessResponseDto(
@@ -9,5 +10,6 @@ public record AccessResponseDto(
     int? AnimalId,
     string? AnimalName,
     double? ConfidenceScore,
-    string? Reason
+    string? Reason,
+    string? Direction
 );

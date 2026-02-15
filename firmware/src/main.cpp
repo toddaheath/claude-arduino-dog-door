@@ -118,7 +118,7 @@ void loop() {
         return;
     }
 
-    AccessResponse response = api_request_access(fb);
+    AccessResponse response = api_request_access(fb, THIS_SIDE);
     camera_release(fb);
     last_detection_time = millis();
 
@@ -132,14 +132,16 @@ void loop() {
 
     // Stage 6: Open or deny
     if (response.allowed) {
-        Serial.printf("Access GRANTED for %s (confidence: %.2f)\n",
-                      response.animalName.c_str(), response.confidenceScore);
+        Serial.printf("Access GRANTED for %s (confidence: %.2f, direction: %s)\n",
+                      response.animalName.c_str(), response.confidenceScore,
+                      response.direction.c_str());
         if (door_open()) {
             door_open_time = millis();
             waiting_for_close = true;
         }
     } else {
-        Serial.printf("Access DENIED: %s\n", response.reason.c_str());
+        Serial.printf("Access DENIED: %s (direction: %s)\n",
+                      response.reason.c_str(), response.direction.c_str());
         led_deny();
         delay(3000);
         led_off();

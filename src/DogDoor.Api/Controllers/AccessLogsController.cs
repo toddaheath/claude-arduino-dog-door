@@ -19,12 +19,13 @@ public class AccessLogsController : ControllerBase
     public async Task<ActionResult<IEnumerable<DoorEventDto>>> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] string? eventType = null)
+        [FromQuery] string? eventType = null,
+        [FromQuery] string? direction = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-        var logs = await _doorService.GetAccessLogsAsync(page, pageSize, eventType);
+        var logs = await _doorService.GetAccessLogsAsync(page, pageSize, eventType, direction);
         return Ok(logs);
     }
 

@@ -10,10 +10,12 @@ struct AccessResponse {
     String animalName;
     float confidenceScore;
     String reason;
+    String direction;
     bool success;  // true if API call succeeded
 };
 
 // Send camera image to API for dog identification
-AccessResponse api_request_access(camera_fb_t* fb);
+// side: "inside" or "outside" indicating which camera triggered the request
+AccessResponse api_request_access(camera_fb_t* fb, const char* side);
 
 #endif // API_CLIENT_H
