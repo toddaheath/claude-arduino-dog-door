@@ -226,4 +226,89 @@ public class DoorServiceTests : IDisposable
         var logged = await _db.DoorEvents.FirstAsync();
         Assert.Equal(DoorEventType.UnknownAnimal, logged.EventType);
     }
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_InsideSide_SetsExitingDirection()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        await _db.SaveChangesAsync();
+
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+            .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(stream, null, "inside");
+
+        Assert.True(result.Allowed);
+        Assert.Equal("Exiting", result.Direction);
+
+        var logged = await _db.DoorEvents.FirstAsync();
+        Assert.Equal(DoorEventType.ExitGranted, logged.EventType);
+        Assert.Equal(DoorSide.Inside, logged.Side);
+        Assert.Equal(TransitDirection.Exiting, logged.Direction);
+    }
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_OutsideSide_SetsEnteringDirection()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        await _db.SaveChangesAsync();
+
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+            .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(stream, null, "outside");
+
+        Assert.True(result.Allowed);
+        Assert.Equal("Entering", result.Direction);
+
+        var logged = await _db.DoorEvents.FirstAsync();
+        Assert.Equal(DoorEventType.EntryGranted, logged.EventType);
+        Assert.Equal(DoorSide.Outside, logged.Side);
+        Assert.Equal(TransitDirection.Entering, logged.Direction);
+    }
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_NullSide_PreservesBackwardCompat()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        await _db.SaveChangesAsync();
+
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+            .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(stream, null, null);
+
+        Assert.True(result.Allowed);
+        Assert.Null(result.Direction);
+
+        var logged = await _db.DoorEvents.FirstAsync();
+        Assert.Equal(DoorEventType.AccessGranted, logged.EventType);
+        Assert.Null(logged.Side);
+        Assert.Null(logged.Direction);
+    }
+
+    [Fact]
+    public async Task GetAccessLogsAsync_WithDirectionFilter_FiltersEvents()
+    {
+        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.EntryGranted, Direction = TransitDirection.Entering });
+        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.ExitGranted, Direction = TransitDirection.Exiting });
+        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.EntryGranted, Direction = TransitDirection.Entering });
+        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.AccessGranted });
+        await _db.SaveChangesAsync();
+
+        var entering = await _service.GetAccessLogsAsync(1, 20, null, "Entering");
+        var exiting = await _service.GetAccessLogsAsync(1, 20, null, "Exiting");
+
+        Assert.Equal(2, entering.Count());
+        Assert.Single(exiting);
+    }
 }

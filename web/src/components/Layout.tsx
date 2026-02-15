@@ -1,4 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import DemoBanner from './DemoBanner';
+
+const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
 
 const navItems = [
   { path: '/', label: 'Animals' },
@@ -11,6 +14,7 @@ export default function Layout() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {isDemo && <DemoBanner />}
       <header style={{
         background: '#1a1a2e',
         color: '#fff',

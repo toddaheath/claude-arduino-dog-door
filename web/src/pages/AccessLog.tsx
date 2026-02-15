@@ -9,20 +9,68 @@ const eventTypeColors: Record<string, string> = {
   DoorOpened: '#1565c0',
   DoorClosed: '#1565c0',
   ManualOverride: '#7b1fa2',
+  ExitGranted: '#2e7d32',
+  ExitDenied: '#c62828',
+  EntryGranted: '#2e7d32',
+  EntryDenied: '#c62828',
+};
+
+const directionBadge = (direction: string | null) => {
+  if (!direction) return null;
+  const isEntering = direction === 'Entering';
+  return (
+    <span style={{
+      padding: '2px 8px',
+      borderRadius: 12,
+      fontSize: 12,
+      fontWeight: 600,
+      background: isEntering ? '#1565c0' : '#e65100',
+      color: '#fff',
+    }}>
+      {isEntering ? 'IN' : 'OUT'}
+    </span>
+  );
 };
 
 export default function AccessLog() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState('');
+  const [directionFilter, setDirectionFilter] = useState('');
 
   const { data: logs, loading, error } = useApi(
-    () => getAccessLogs(page, 20, filter || undefined),
-    [page, filter],
+    () => getAccessLogs(page, 20, filter || undefined, directionFilter || undefined),
+    [page, filter, directionFilter],
   );
+
+  const enteringCount = logs?.filter(l => l.direction === 'Entering').length ?? 0;
+  const exitingCount = logs?.filter(l => l.direction === 'Exiting').length ?? 0;
 
   return (
     <div>
       <h2>Access Log</h2>
+
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{
+          padding: '6px 14px',
+          borderRadius: 8,
+          background: '#1a237e',
+          color: '#90caf9',
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          Entries: {enteringCount}
+        </div>
+        <div style={{
+          padding: '6px 14px',
+          borderRadius: 8,
+          background: '#bf360c',
+          color: '#ffcc80',
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          Exits: {exitingCount}
+        </div>
+      </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <select
@@ -33,10 +81,24 @@ export default function AccessLog() {
           <option value="">All Events</option>
           <option value="AccessGranted">Access Granted</option>
           <option value="AccessDenied">Access Denied</option>
+          <option value="ExitGranted">Exit Granted</option>
+          <option value="ExitDenied">Exit Denied</option>
+          <option value="EntryGranted">Entry Granted</option>
+          <option value="EntryDenied">Entry Denied</option>
           <option value="UnknownAnimal">Unknown Animal</option>
           <option value="DoorOpened">Door Opened</option>
           <option value="DoorClosed">Door Closed</option>
           <option value="ManualOverride">Manual Override</option>
+        </select>
+
+        <select
+          value={directionFilter}
+          onChange={e => { setDirectionFilter(e.target.value); setPage(1); }}
+          style={{ padding: 8, borderRadius: 4, border: '1px solid #444', background: '#1a1a2e', color: '#fff' }}
+        >
+          <option value="">All Directions</option>
+          <option value="Entering">Entering</option>
+          <option value="Exiting">Exiting</option>
         </select>
       </div>
 
@@ -48,6 +110,7 @@ export default function AccessLog() {
           <tr style={{ borderBottom: '2px solid #333', textAlign: 'left' }}>
             <th style={{ padding: 8 }}>Time</th>
             <th style={{ padding: 8 }}>Event</th>
+            <th style={{ padding: 8 }}>Direction</th>
             <th style={{ padding: 8 }}>Animal</th>
             <th style={{ padding: 8 }}>Confidence</th>
             <th style={{ padding: 8 }}>Notes</th>
@@ -70,6 +133,9 @@ export default function AccessLog() {
                   {log.eventType}
                 </span>
               </td>
+              <td style={{ padding: 8 }}>
+                {directionBadge(log.direction)}
+              </td>
               <td style={{ padding: 8 }}>{log.animalName || '-'}</td>
               <td style={{ padding: 8 }}>
                 {log.confidenceScore != null ? `${(log.confidenceScore * 100).toFixed(0)}%` : '-'}
@@ -79,7 +145,7 @@ export default function AccessLog() {
           ))}
           {logs?.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#666' }}>
+              <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#666' }}>
                 No events found.
               </td>
             </tr>

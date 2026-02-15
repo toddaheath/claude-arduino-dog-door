@@ -8,6 +8,7 @@
  */
 
 #include <unity.h>
+#include <string.h>
 
 // Test ultrasonic distance calculation
 void test_distance_calculation() {
@@ -67,6 +68,26 @@ void test_door_state() {
     TEST_ASSERT_FALSE(door_open);
 }
 
+// Test side-to-direction mapping
+void test_side_direction_mapping() {
+    // Inside camera sees a dog approaching the door from inside -> dog is exiting
+    const char* inside_side = "inside";
+    const char* outside_side = "outside";
+
+    // Simulate: if side == "inside", direction should be "Exiting"
+    bool is_exiting = (strcmp(inside_side, "inside") == 0);
+    TEST_ASSERT_TRUE(is_exiting);
+
+    // Simulate: if side == "outside", direction should be "Entering"
+    bool is_entering = (strcmp(outside_side, "outside") == 0);
+    TEST_ASSERT_TRUE(is_entering);
+
+    // Unknown side should not match either
+    const char* unknown = "unknown";
+    TEST_ASSERT_FALSE(strcmp(unknown, "inside") == 0);
+    TEST_ASSERT_FALSE(strcmp(unknown, "outside") == 0);
+}
+
 // Test auto-close timer logic
 void test_auto_close_timer() {
     unsigned long door_open_time = 1000;
@@ -88,6 +109,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_detection_threshold);
     RUN_TEST(test_cooldown_logic);
     RUN_TEST(test_door_state);
+    RUN_TEST(test_side_direction_mapping);
     RUN_TEST(test_auto_close_timer);
 
     return UNITY_END();

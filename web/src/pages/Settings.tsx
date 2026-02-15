@@ -113,6 +113,24 @@ export default function Settings() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </form>
+
+      <div style={{ marginTop: 32, padding: 16, background: '#1a1a2e', borderRadius: 8, maxWidth: 500 }}>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: 16 }}>System Info</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14, color: '#ccc' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Dual-Sided Detection</span>
+            <span style={{ color: '#4fc3f7', fontWeight: 600 }}>Supported</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Direction Tracking</span>
+            <span style={{ color: '#4fc3f7', fontWeight: 600 }}>Entering / Exiting</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Camera Sides</span>
+            <span style={{ color: '#999' }}>Inside + Outside</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

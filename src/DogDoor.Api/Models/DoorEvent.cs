@@ -9,7 +9,24 @@ public enum DoorEventType
     DoorOpened,
     DoorClosed,
     UnknownAnimal,
-    ManualOverride
+    ManualOverride,
+    ExitGranted,
+    ExitDenied,
+    EntryGranted,
+    EntryDenied
+}
+
+public enum DoorSide
+{
+    Inside,
+    Outside
+}
+
+public enum TransitDirection
+{
+    Entering,
+    Exiting,
+    Unknown
 }
 
 public class DoorEvent
@@ -29,6 +46,10 @@ public class DoorEvent
     public string? Notes { get; set; }
 
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    public DoorSide? Side { get; set; }
+
+    public TransitDirection? Direction { get; set; }
 
     public Animal? Animal { get; set; }
 }

@@ -36,6 +36,8 @@ export interface DoorEvent {
   confidenceScore: number | null;
   notes: string | null;
   timestamp: string;
+  side: string | null;
+  direction: string | null;
 }
 
 export interface DoorConfiguration {
@@ -64,4 +66,5 @@ export interface AccessResponse {
   animalName: string | null;
   confidenceScore: number | null;
   reason: string | null;
+  direction: string | null;
 }

@@ -23,10 +23,10 @@ public class AccessLogsControllerTests
     {
         var logs = new List<DoorEventDto>
         {
-            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow),
-            new(2, null, null, DoorEventType.UnknownAnimal, 0.3, "Not recognized", DateTime.UtcNow)
+            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null),
+            new(2, null, null, DoorEventType.UnknownAnimal, 0.3, "Not recognized", DateTime.UtcNow, null, null)
         };
-        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null)).ReturnsAsync(logs);
+        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null, null)).ReturnsAsync(logs);
 
         var result = await _controller.GetAll();
 
@@ -40,9 +40,9 @@ public class AccessLogsControllerTests
     {
         var logs = new List<DoorEventDto>
         {
-            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow)
+            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null)
         };
-        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, "AccessGranted")).ReturnsAsync(logs);
+        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, "AccessGranted", null)).ReturnsAsync(logs);
 
         var result = await _controller.GetAll(eventType: "AccessGranted");
 
@@ -52,9 +52,25 @@ public class AccessLogsControllerTests
     }
 
     [Fact]
+    public async Task GetAll_WithDirectionFilter_PassesDirection()
+    {
+        var logs = new List<DoorEventDto>
+        {
+            new(1, 1, "Buddy", DoorEventType.EntryGranted, 0.9, null, DateTime.UtcNow, "Outside", "Entering")
+        };
+        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null, "Entering")).ReturnsAsync(logs);
+
+        var result = await _controller.GetAll(direction: "Entering");
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var returned = Assert.IsAssignableFrom<IEnumerable<DoorEventDto>>(okResult.Value);
+        Assert.Single(returned);
+    }
+
+    [Fact]
     public async Task GetById_ExistingId_ReturnsOk()
     {
-        var log = new DoorEventDto(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow);
+        var log = new DoorEventDto(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null);
         _mockService.Setup(s => s.GetAccessLogAsync(1)).ReturnsAsync(log);
 
         var result = await _controller.GetById(1);
@@ -77,11 +93,11 @@ public class AccessLogsControllerTests
     [Fact]
     public async Task GetAll_NegativePage_DefaultsToOne()
     {
-        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null))
+        _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null, null))
             .ReturnsAsync(new List<DoorEventDto>());
 
         var result = await _controller.GetAll(page: -1);
 
-        _mockService.Verify(s => s.GetAccessLogsAsync(1, 20, null), Times.Once);
+        _mockService.Verify(s => s.GetAccessLogsAsync(1, 20, null, null), Times.Once);
     }
 }

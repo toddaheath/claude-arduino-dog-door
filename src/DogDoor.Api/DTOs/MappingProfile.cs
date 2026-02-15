@@ -15,7 +15,9 @@ public class MappingProfile : Profile
         CreateMap<AnimalPhoto, PhotoDto>();
 
         CreateMap<DoorEvent, DoorEventDto>()
-            .ForCtorParam("AnimalName", opt => opt.MapFrom(src => src.Animal != null ? src.Animal.Name : null));
+            .ForCtorParam("AnimalName", opt => opt.MapFrom(src => src.Animal != null ? src.Animal.Name : null))
+            .ForCtorParam("Side", opt => opt.MapFrom(src => src.Side != null ? src.Side.ToString() : null))
+            .ForCtorParam("Direction", opt => opt.MapFrom(src => src.Direction != null ? src.Direction.ToString() : null));
 
         CreateMap<DoorConfiguration, DoorConfigurationDto>();
     }
