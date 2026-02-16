@@ -85,3 +85,28 @@ jobs:
 
       - name: Run unit tests
         run: pio test -d firmware -e native
+
+  marketing:
+    name: Marketing (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: marketing/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: marketing
+
+      - name: Lint
+        run: npm run lint
+        working-directory: marketing
+
+      - name: Build
+        run: npm run build
+        working-directory: marketing
