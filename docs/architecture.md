@@ -4,6 +4,8 @@
 
 The Smart Dog Door is a multi-tier IoT system that uses edge AI to detect and identify dogs, automatically controlling a physical door mechanism.
 
+> **Interactive version**: Open [architecture-animation.html](architecture-animation.html) in a browser to see an animated walkthrough of the full data flow.
+
 ## System Diagram
 
 ```mermaid
@@ -58,17 +60,18 @@ sequenceDiagram
     ESP->>ESP: TFLite: dog vs not-dog
 
     alt Dog Detected
-        ESP->>API: POST /api/doors/access-request (image)
+        ESP->>API: POST /api/doors/access-request (image, side)
+        API->>API: Determine direction from side (inside→exiting, outside→entering)
         API->>API: pHash compare with stored photos
-        API->>DB: Log door event
+        API->>DB: Log door event (with side + direction)
 
         alt Known Dog (Allowed)
-            API-->>ESP: 200 OK {allow: true, animalId: 1}
+            API-->>ESP: 200 OK {allow: true, animalId: 1, direction: "entering"}
             ESP->>ESP: Open door actuator
             ESP->>ESP: Wait for IR beam clear
             ESP->>ESP: Close door actuator
         else Unknown / Denied
-            API-->>ESP: 200 OK {allow: false}
+            API-->>ESP: 200 OK {allow: false, direction: "entering"}
             ESP->>ESP: Flash deny LED
         end
     else Not a Dog
@@ -90,14 +93,16 @@ sequenceDiagram
 - **Safety**: Reed switch monitors door position, IR beam prevents closing on animal
 
 ### .NET Web API
-- **Framework**: ASP.NET Core 8.0
-- **Database**: PostgreSQL via Entity Framework Core
+- **Framework**: ASP.NET Core 8.0 with Entity Framework Core 9.x
+- **Database**: PostgreSQL via Npgsql EF Core provider 9.x
 - **Recognition**: Perceptual hashing (pHash) compares camera images to stored animal profile photos
-- **Storage**: Photos stored on filesystem, paths tracked in database
+- **Direction Detection**: Dual-sided cameras report which side (inside/outside) triggered the request; the API infers transit direction (entering/exiting)
+- **Storage**: Photos stored on filesystem (`uploads/`), paths tracked in database
 
 ### React Admin SPA
 - **Stack**: React 18, TypeScript, Vite
 - **Features**: Animal management, photo upload, access log viewer, door configuration
+- **Demo Mode**: Supports `VITE_DEMO_MODE=true` for GitHub Pages deployment (uses HashRouter)
 - **Deployment**: Static build served by nginx
 
 ### Infrastructure
@@ -116,7 +121,7 @@ sequenceDiagram
 | GET | /api/animals/{id}/photos | List animal photos |
 | POST | /api/photos/upload/{animalId} | Upload photo |
 | DELETE | /api/photos/{id} | Delete photo |
-| POST | /api/doors/access-request | Request door access (from ESP32) |
+| POST | /api/doors/access-request | Request door access (image + optional side + apiKey) |
 | GET | /api/doors/status | Get door status |
 | PUT | /api/doors/configuration | Update door config |
 | GET | /api/access-logs | Query access logs |
