@@ -90,7 +90,7 @@ jobs:
         run: npm run build
         working-directory: web
         env:
-          VITE_API_URL: https://dog-door-api.heathrobotics.io
+          VITE_API_URL: https://dog-door-api.heathrobotics.io/api
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
