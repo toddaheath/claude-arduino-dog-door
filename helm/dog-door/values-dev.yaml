@@ -12,6 +12,11 @@ postgres:
 ingress:
   enabled: true
   host: dog-door-api.dev.heathrobotics.io
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: dogdoor-api-dev-tls
 
 config:
   aspnetcoreEnvironment: Development
