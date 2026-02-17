@@ -37,7 +37,7 @@ spec:
                   key: POSTGRES_DB
           volumeMounts:
             - name: pgdata
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql/data/initdb
           resources:
             {{- toYaml .Values.postgres.resources | nindent 12 }}
           readinessProbe:
