@@ -55,10 +55,9 @@ var uploadsPath = Path.Combine(app.Environment.ContentRootPath,
     builder.Configuration.GetValue<string>("PhotoStorage:BasePath") ?? "uploads");
 Directory.CreateDirectory(uploadsPath);
 
-// Auto-migrate in development
-if (app.Environment.IsDevelopment())
+// Ensure database schema exists
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<DogDoorDbContext>();
     db.Database.EnsureCreated();
 }
