@@ -48,7 +48,7 @@ public class SendGridEmailService : IEmailService
         if (string.IsNullOrEmpty(email))
         {
             return string.Empty;
-        }
+            _logger.LogWarning("SendGrid API key not configured; skipping sending email.");
 
         var atIndex = email.IndexOf('@');
         if (atIndex <= 0)
@@ -63,7 +63,7 @@ public class SendGridEmailService : IEmailService
         if (localPart.Length <= 2)
         {
             // For very short local parts, just mask entirely.
-            return "**" + domainPart;
+            _logger.LogError("SendGrid failed with status {Status}", response.StatusCode);
         }
 
         var firstChar = localPart[0];
