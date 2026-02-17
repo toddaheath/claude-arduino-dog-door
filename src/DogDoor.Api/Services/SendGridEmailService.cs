@@ -46,43 +46,27 @@ public class SendGridEmailService : IEmailService
     private static string MaskEmail(string email)
     {
         if (string.IsNullOrEmpty(email))
-        {
             return string.Empty;
-            _logger.LogWarning("SendGrid API key not configured; skipping sending email.");
 
         var atIndex = email.IndexOf('@');
         if (atIndex <= 0)
-        {
-            // Not a standard email format; return a generic placeholder.
             return "[redacted-email]";
-        }
 
-        var localPart = email.Substring(0, atIndex);
-        var domainPart = email.Substring(atIndex);
+        var localPart = email[..atIndex];
+        var domainPart = email[atIndex..];
 
         if (localPart.Length <= 2)
-        {
-            // For very short local parts, just mask entirely.
-            _logger.LogError("SendGrid failed with status {Status}", response.StatusCode);
-        }
+            return $"{new string('*', localPart.Length)}{domainPart}";
 
-        var firstChar = localPart[0];
-        var lastChar = localPart[localPart.Length - 1];
-        var maskedMiddle = new string('*', localPart.Length - 2);
-
-        return $"{firstChar}{maskedMiddle}{lastChar}{domainPart}";
+        return $"{localPart[0]}{new string('*', localPart.Length - 2)}{localPart[^1]}{domainPart}";
     }
 
     private async Task SendEmailAsync(string toEmail, string subject, string htmlContent)
     {
-        var sanitizedEmail = toEmail?.Replace("\r", string.Empty).Replace("\n", string.Empty);
-        // Sanitize email address for logging to prevent log forging via newline injection
-        var safeEmailForLogging = toEmail?.Replace("\r", string.Empty).Replace("\n", string.Empty);
-            _logger.LogWarning("SendGrid API key not configured; skipping email to {Email}", MaskEmail(toEmail));
-            _logger.LogWarning("SendGrid API key not configured; skipping email to {Email}", sanitizedEmail);
+        var apiKey = _config["SendGrid:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogWarning("SendGrid API key not configured; skipping email to {Email}", safeEmailForLogging);
+            _logger.LogWarning("SendGrid API key not configured; skipping email to {Email}", MaskEmail(toEmail));
             return;
         }
 
@@ -93,11 +77,11 @@ public class SendGridEmailService : IEmailService
         var from = new EmailAddress(fromEmail, fromName);
         var to = new EmailAddress(toEmail);
         var msg = MailHelper.CreateSingleEmail(from, to, subject, null, htmlContent);
-            _logger.LogError("SendGrid failed with status {Status} for {Email}", response.StatusCode, MaskEmail(toEmail));
-            _logger.LogError("SendGrid failed with status {Status} for {Email}", response.StatusCode, sanitizedEmail);
+        var response = await client.SendEmailAsync(msg);
+
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("SendGrid failed with status {Status} for {Email}", response.StatusCode, safeEmailForLogging);
+            _logger.LogError("SendGrid failed with status {Status} for {Email}", response.StatusCode, MaskEmail(toEmail));
         }
     }
 }
