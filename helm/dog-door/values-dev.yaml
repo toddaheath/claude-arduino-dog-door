@@ -1,0 +1,18 @@
+api:
+  image:
+    repository: acrheathrobotics.azurecr.io/dogdoor-api
+  replicas: 1
+
+web:
+  enabled: false
+
+postgres:
+  enabled: true
+
+ingress:
+  enabled: true
+  host: dog-door-api.dev.heathrobotics.io
+
+config:
+  aspnetcoreEnvironment: Development
+  corsOrigins: "https://dog-door.dev.heathrobotics.io"

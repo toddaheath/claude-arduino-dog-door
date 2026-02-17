@@ -1,0 +1,28 @@
+api:
+  image:
+    repository: acrheathrobotics.azurecr.io/dogdoor-api
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+web:
+  enabled: false
+
+postgres:
+  enabled: true
+
+ingress:
+  enabled: true
+  host: dog-door-api.heathrobotics.io
+  tls:
+    enabled: true
+    secretName: dogdoor-api-tls
+
+config:
+  aspnetcoreEnvironment: Production
+  corsOrigins: "https://dog-door.heathrobotics.io"

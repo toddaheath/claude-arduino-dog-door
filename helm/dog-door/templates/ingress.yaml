@@ -5,6 +5,9 @@ metadata:
   name: {{ .Release.Name }}-ingress
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
@@ -26,6 +29,7 @@ spec:
                 name: {{ .Release.Name }}-api
                 port:
                   number: {{ .Values.api.port }}
+          {{- if .Values.web.enabled }}
           - path: /
             pathType: Prefix
             backend:
@@ -33,4 +37,5 @@ spec:
                 name: {{ .Release.Name }}-web
                 port:
                   number: {{ .Values.web.port }}
+          {{- end }}
 {{- end }}
