@@ -112,7 +112,30 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DogDoorDbContext>();
     if (db.Database.IsRelational())
+    {
+        // If the DB was previously created via EnsureCreated it will have tables but no
+        // __EFMigrationsHistory row. Create the history table and record InitialCreate as
+        // already applied so MigrateAsync doesn't try to re-create existing tables.
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+                "MigrationId"    character varying(150) NOT NULL,
+                "ProductVersion" character varying(32)  NOT NULL,
+                CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+            );
+            """);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            SELECT '20260217200700_InitialCreate', '9.0.13'
+            WHERE NOT EXISTS (SELECT 1 FROM "__EFMigrationsHistory")
+              AND EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'Animals'
+              );
+            """);
+
         await db.Database.MigrateAsync();
+    }
     else
         await db.Database.EnsureCreatedAsync();
 }
