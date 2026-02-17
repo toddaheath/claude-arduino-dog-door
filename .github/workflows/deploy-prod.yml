@@ -2,8 +2,11 @@ name: "Deploy: Prod"
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    paths:
+      - "src/DogDoor.Api/**"
+      - "helm/**"
+      - "web/**"
   workflow_dispatch:
 
 permissions:
@@ -40,12 +43,7 @@ jobs:
 
       - name: Set image tag
         id: tag
-        run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "image_tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "image_tag=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "image_tag=prod-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
