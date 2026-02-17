@@ -45,10 +45,13 @@ public class SendGridEmailService : IEmailService
 
     private async Task SendEmailAsync(string toEmail, string subject, string htmlContent)
     {
+        // Sanitize email address for logging to prevent log forging via newline injection
+        var safeEmailForLogging = toEmail?.Replace("\r", string.Empty).Replace("\n", string.Empty);
+
         var apiKey = _config["SendGrid:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogWarning("SendGrid API key not configured; skipping email to {Email}", toEmail);
+            _logger.LogWarning("SendGrid API key not configured; skipping email to {Email}", safeEmailForLogging);
             return;
         }
 
@@ -63,7 +66,7 @@ public class SendGridEmailService : IEmailService
         var response = await client.SendEmailAsync(msg);
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogError("SendGrid failed with status {Status} for {Email}", response.StatusCode, toEmail);
+            _logger.LogError("SendGrid failed with status {Status} for {Email}", response.StatusCode, safeEmailForLogging);
         }
     }
 }
