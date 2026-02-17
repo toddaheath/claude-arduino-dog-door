@@ -5,3 +5,6 @@ metadata:
 data:
   ASPNETCORE_ENVIRONMENT: {{ .Values.config.aspnetcoreEnvironment | quote }}
   PhotoStorage__BasePath: {{ .Values.config.photoStoragePath | quote }}
+  {{- if .Values.config.corsOrigins }}
+  Cors__AllowedOrigins__0: {{ .Values.config.corsOrigins | quote }}
+  {{- end }}

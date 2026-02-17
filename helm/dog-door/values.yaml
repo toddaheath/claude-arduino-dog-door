@@ -16,6 +16,7 @@ api:
       memory: 512Mi
 
 web:
+  enabled: true
   image:
     repository: ghcr.io/toddaheath/dogdoor-web
     tag: latest
@@ -31,6 +32,7 @@ web:
       memory: 128Mi
 
 postgres:
+  enabled: true
   image:
     repository: postgres
     tag: "16-alpine"
@@ -50,6 +52,7 @@ ingress:
   enabled: false
   className: nginx
   host: dogdoor.local
+  annotations: {}
   tls:
     enabled: false
     secretName: dogdoor-tls
@@ -57,6 +60,7 @@ ingress:
 config:
   aspnetcoreEnvironment: Production
   photoStoragePath: /app/uploads
+  corsOrigins: ""
 
 secret:
   postgresUser: dogdoor
