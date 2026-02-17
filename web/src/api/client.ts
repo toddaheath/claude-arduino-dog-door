@@ -9,9 +9,7 @@ import type {
   UpdateDoorConfiguration,
 } from '../types';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
-});
+const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL || ''}/api` });
 
 // Animals
 const _getAnimals = () => api.get<Animal[]>('/animals').then(r => r.data);
