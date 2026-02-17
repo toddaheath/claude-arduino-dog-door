@@ -1,10 +1,6 @@
-name: "Deploy SPA: Dev"
+name: "Deploy SPA: Prod"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
   workflow_dispatch:
 
 permissions:
@@ -13,14 +9,14 @@ permissions:
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy to dev
+    name: Build & Deploy to prod
     runs-on: ubuntu-latest
-    environment: dev
+    environment: prod
     steps:
       - name: Check Azure credentials
         run: |
           if [[ -z "${{ secrets.AZURE_CLIENT_ID }}" ]]; then
-            echo "::error::Azure OIDC credentials not configured for 'dev' environment. Add AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID secrets."
+            echo "::error::Azure OIDC credentials not configured for 'prod' environment. Add AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID secrets."
             exit 1
           fi
 
@@ -41,7 +37,7 @@ jobs:
         run: npm run build
         working-directory: web
         env:
-          VITE_API_URL: https://dog-door-api.dev.heathrobotics.io
+          VITE_API_URL: https://dog-door-api.heathrobotics.io
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -53,7 +49,7 @@ jobs:
       - name: Upload to Azure Storage
         run: |
           az storage blob upload-batch \
-            --account-name stdogdoorspadev \
+            --account-name stdogdoorspaprod \
             --destination '$web' \
             --source web/dist \
             --overwrite
@@ -61,7 +57,7 @@ jobs:
       - name: Set cache headers for hashed assets
         run: |
           az storage blob upload-batch \
-            --account-name stdogdoorspadev \
+            --account-name stdogdoorspaprod \
             --destination '$web' \
             --source web/dist/assets \
             --destination-path assets \
@@ -71,7 +67,7 @@ jobs:
       - name: Set cache headers for index.html
         run: |
           az storage blob upload \
-            --account-name stdogdoorspadev \
+            --account-name stdogdoorspaprod \
             --container-name '$web' \
             --file web/dist/index.html \
             --name index.html \
