@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { UserSummary } from '../types';
 import { authApi } from '../api/auth';
@@ -15,24 +16,17 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<UserSummary | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Restore session from localStorage on mount
-  useEffect(() => {
-    const storedAccess = localStorage.getItem('accessToken');
-    const storedRefresh = localStorage.getItem('refreshToken');
-    const storedUser = localStorage.getItem('currentUser');
-
-    if (storedAccess && storedRefresh && storedUser) {
-      setAccessToken(storedAccess);
-      setRefreshToken(storedRefresh);
-      setCurrentUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+  // Lazy initializers read localStorage once on mount — no effect needed
+  const [currentUser, setCurrentUser] = useState<UserSummary | null>(() => {
+    const stored = localStorage.getItem('currentUser');
+    return stored ? JSON.parse(stored) : null;
+  });
+  const [accessToken, setAccessToken] = useState<string | null>(() =>
+    localStorage.getItem('accessToken')
+  );
+  const [refreshToken, setRefreshToken] = useState<string | null>(() =>
+    localStorage.getItem('refreshToken')
+  );
 
   const saveSession = useCallback((access: string, refresh: string, user: UserSummary) => {
     localStorage.setItem('accessToken', access);
@@ -79,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshToken, clearSession]);
 
   return (
-    <AuthContext.Provider value={{ currentUser, accessToken, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ currentUser, accessToken, isLoading: false, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
