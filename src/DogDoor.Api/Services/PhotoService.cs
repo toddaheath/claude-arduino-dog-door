@@ -21,8 +21,12 @@ public class PhotoService : IPhotoService
         _env = env;
     }
 
-    public async Task<IEnumerable<PhotoDto>> GetByAnimalIdAsync(int animalId)
+    public async Task<IEnumerable<PhotoDto>> GetByAnimalIdAsync(int animalId, int userId)
     {
+        // Verify the animal belongs to the user
+        var animalExists = await _db.Animals.AnyAsync(a => a.Id == animalId && a.UserId == userId);
+        if (!animalExists) return Enumerable.Empty<PhotoDto>();
+
         var photos = await _db.AnimalPhotos
             .Where(p => p.AnimalId == animalId)
             .OrderByDescending(p => p.UploadedAt)
@@ -31,9 +35,9 @@ public class PhotoService : IPhotoService
         return _mapper.Map<IEnumerable<PhotoDto>>(photos);
     }
 
-    public async Task<PhotoDto?> UploadAsync(int animalId, Stream fileStream, string fileName)
+    public async Task<PhotoDto?> UploadAsync(int animalId, Stream fileStream, string fileName, int userId)
     {
-        var animal = await _db.Animals.FindAsync(animalId);
+        var animal = await _db.Animals.FirstOrDefaultAsync(a => a.Id == animalId && a.UserId == userId);
         if (animal is null) return null;
 
         var basePath = _config.GetValue<string>("PhotoStorage:BasePath") ?? "uploads";
@@ -67,9 +71,12 @@ public class PhotoService : IPhotoService
         return _mapper.Map<PhotoDto>(photo);
     }
 
-    public async Task<(Stream? Stream, string? ContentType)?> GetFileAsync(int photoId)
+    public async Task<(Stream? Stream, string? ContentType)?> GetFileAsync(int photoId, int userId)
     {
-        var photo = await _db.AnimalPhotos.FindAsync(photoId);
+        var photo = await _db.AnimalPhotos
+            .Include(p => p.Animal)
+            .FirstOrDefaultAsync(p => p.Id == photoId && p.Animal.UserId == userId);
+
         if (photo is null || !File.Exists(photo.FilePath)) return null;
 
         var ext = Path.GetExtension(photo.FilePath).ToLowerInvariant();
@@ -84,9 +91,12 @@ public class PhotoService : IPhotoService
         return (stream, contentType);
     }
 
-    public async Task<bool> DeleteAsync(int photoId)
+    public async Task<bool> DeleteAsync(int photoId, int userId)
     {
-        var photo = await _db.AnimalPhotos.FindAsync(photoId);
+        var photo = await _db.AnimalPhotos
+            .Include(p => p.Animal)
+            .FirstOrDefaultAsync(p => p.Id == photoId && p.Animal.UserId == userId);
+
         if (photo is null) return false;
 
         if (File.Exists(photo.FilePath))

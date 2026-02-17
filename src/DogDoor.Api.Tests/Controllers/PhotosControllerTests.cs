@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using DogDoor.Api.Controllers;
 using DogDoor.Api.DTOs;
 using DogDoor.Api.Services;
@@ -10,12 +11,28 @@ namespace DogDoor.Api.Tests.Controllers;
 public class PhotosControllerTests
 {
     private readonly Mock<IPhotoService> _mockService;
+    private readonly Mock<IUserService> _mockUserService;
     private readonly PhotosController _controller;
+    private const int UserId = 1;
 
     public PhotosControllerTests()
     {
         _mockService = new Mock<IPhotoService>();
-        _controller = new PhotosController(_mockService.Object);
+        _mockUserService = new Mock<IUserService>();
+
+        _mockUserService.Setup(s => s.ResolveEffectiveUserIdAsync(UserId, null))
+            .ReturnsAsync(UserId);
+
+        _controller = new PhotosController(_mockService.Object, _mockUserService.Object);
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    new[] { new Claim(ClaimTypes.NameIdentifier, UserId.ToString()) },
+                    "Test"))
+            }
+        };
     }
 
     [Fact]
@@ -26,7 +43,7 @@ public class PhotosControllerTests
             new(1, 1, "buddy1.jpg", 12345, DateTime.UtcNow),
             new(2, 1, "buddy2.jpg", 23456, DateTime.UtcNow)
         };
-        _mockService.Setup(s => s.GetByAnimalIdAsync(1)).ReturnsAsync(photos);
+        _mockService.Setup(s => s.GetByAnimalIdAsync(1, UserId)).ReturnsAsync(photos);
 
         var result = await _controller.GetByAnimal(1);
 
@@ -83,7 +100,7 @@ public class PhotosControllerTests
         mockFile.Setup(f => f.FileName).Returns("test.jpg");
         mockFile.Setup(f => f.OpenReadStream()).Returns(stream);
 
-        _mockService.Setup(s => s.UploadAsync(99, It.IsAny<Stream>(), "test.jpg"))
+        _mockService.Setup(s => s.UploadAsync(99, It.IsAny<Stream>(), "test.jpg", UserId))
             .ReturnsAsync((PhotoDto?)null);
 
         var result = await _controller.Upload(99, mockFile.Object);
@@ -102,7 +119,7 @@ public class PhotosControllerTests
         mockFile.Setup(f => f.OpenReadStream()).Returns(stream);
 
         var photo = new PhotoDto(1, 1, "buddy.jpg", content.Length, DateTime.UtcNow);
-        _mockService.Setup(s => s.UploadAsync(1, It.IsAny<Stream>(), "buddy.jpg"))
+        _mockService.Setup(s => s.UploadAsync(1, It.IsAny<Stream>(), "buddy.jpg", UserId))
             .ReturnsAsync(photo);
 
         var result = await _controller.Upload(1, mockFile.Object);
@@ -115,7 +132,7 @@ public class PhotosControllerTests
     [Fact]
     public async Task Delete_ExistingId_ReturnsNoContent()
     {
-        _mockService.Setup(s => s.DeleteAsync(1)).ReturnsAsync(true);
+        _mockService.Setup(s => s.DeleteAsync(1, UserId)).ReturnsAsync(true);
 
         var result = await _controller.Delete(1);
 
@@ -125,7 +142,7 @@ public class PhotosControllerTests
     [Fact]
     public async Task Delete_NonExistingId_ReturnsNotFound()
     {
-        _mockService.Setup(s => s.DeleteAsync(99)).ReturnsAsync(false);
+        _mockService.Setup(s => s.DeleteAsync(99, UserId)).ReturnsAsync(false);
 
         var result = await _controller.Delete(99);
 

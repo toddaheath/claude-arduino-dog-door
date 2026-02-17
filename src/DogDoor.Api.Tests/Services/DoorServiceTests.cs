@@ -5,7 +5,6 @@ using DogDoor.Api.Models;
 using DogDoor.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Moq;
 
 namespace DogDoor.Api.Tests.Services;
@@ -17,6 +16,7 @@ public class DoorServiceTests : IDisposable
     private readonly Mock<IAnimalRecognitionService> _mockRecognition;
     private readonly DoorService _service;
     private readonly string _tempDir;
+    private const int UserId = 1;
 
     public DoorServiceTests()
     {
@@ -55,10 +55,24 @@ public class DoorServiceTests : IDisposable
             Directory.Delete(_tempDir, true);
     }
 
+    private DoorConfiguration CreateConfig(bool isEnabled = true, string? apiKey = null)
+    {
+        return new DoorConfiguration
+        {
+            UserId = UserId,
+            IsEnabled = isEnabled,
+            ApiKey = apiKey,
+            AutoCloseEnabled = true,
+            AutoCloseDelaySeconds = 10,
+            MinConfidenceThreshold = 0.7,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
     [Fact]
     public async Task GetConfigurationAsync_NoConfig_CreatesDefault()
     {
-        var result = await _service.GetConfigurationAsync();
+        var result = await _service.GetConfigurationAsync(UserId);
 
         Assert.True(result.IsEnabled);
         Assert.True(result.AutoCloseEnabled);
@@ -69,10 +83,10 @@ public class DoorServiceTests : IDisposable
     public async Task UpdateConfigurationAsync_UpdatesFields()
     {
         // Ensure a config exists
-        await _service.GetConfigurationAsync();
+        await _service.GetConfigurationAsync(UserId);
 
         var dto = new UpdateDoorConfigurationDto(false, null, 30, null, null, null, null);
-        var result = await _service.UpdateConfigurationAsync(dto);
+        var result = await _service.UpdateConfigurationAsync(dto, UserId);
 
         Assert.False(result.IsEnabled);
         Assert.Equal(30, result.AutoCloseDelaySeconds);
@@ -81,7 +95,7 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_DoorDisabled_ReturnsDenied()
     {
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = false });
+        _db.DoorConfigurations.Add(CreateConfig(isEnabled: false));
         await _db.SaveChangesAsync();
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -94,7 +108,7 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_InvalidApiKey_ReturnsDenied()
     {
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, ApiKey = "valid-key" });
+        _db.DoorConfigurations.Add(CreateConfig(apiKey: "valid-key"));
         await _db.SaveChangesAsync();
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -107,12 +121,12 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_KnownAllowedAnimal_ReturnsAllowed()
     {
-        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
         _db.Animals.Add(animal);
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -125,12 +139,12 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_KnownDeniedAnimal_ReturnsDenied()
     {
-        var animal = new Animal { Name = "Stray", IsAllowed = false };
+        var animal = new Animal { Name = "Stray", IsAllowed = false, UserId = UserId };
         _db.Animals.Add(animal);
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(animal.Id, "Stray", 0.85));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -143,10 +157,10 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_UnknownAnimal_ReturnsDenied()
     {
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(null, null, 0.2));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -162,15 +176,16 @@ public class DoorServiceTests : IDisposable
         _db.DoorEvents.AddRange(
             Enumerable.Range(1, 25).Select(i => new DoorEvent
             {
+                UserId = UserId,
                 EventType = DoorEventType.AccessGranted,
                 Timestamp = DateTime.UtcNow.AddMinutes(-i)
             })
         );
         await _db.SaveChangesAsync();
 
-        var page1 = await _service.GetAccessLogsAsync(1, 10, null);
-        var page2 = await _service.GetAccessLogsAsync(2, 10, null);
-        var page3 = await _service.GetAccessLogsAsync(3, 10, null);
+        var page1 = await _service.GetAccessLogsAsync(1, 10, null, null, UserId);
+        var page2 = await _service.GetAccessLogsAsync(2, 10, null, null, UserId);
+        var page3 = await _service.GetAccessLogsAsync(3, 10, null, null, UserId);
 
         Assert.Equal(10, page1.Count());
         Assert.Equal(10, page2.Count());
@@ -180,12 +195,12 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task GetAccessLogsAsync_WithFilter_FiltersEvents()
     {
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.AccessGranted });
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.AccessDenied });
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.AccessGranted });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.AccessGranted });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.AccessDenied });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.AccessGranted });
         await _db.SaveChangesAsync();
 
-        var result = await _service.GetAccessLogsAsync(1, 20, "AccessGranted");
+        var result = await _service.GetAccessLogsAsync(1, 20, "AccessGranted", null, UserId);
 
         Assert.Equal(2, result.Count());
     }
@@ -193,11 +208,11 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task GetAccessLogAsync_ExistingId_ReturnsEvent()
     {
-        var doorEvent = new DoorEvent { EventType = DoorEventType.AccessGranted, Notes = "Test" };
+        var doorEvent = new DoorEvent { UserId = UserId, EventType = DoorEventType.AccessGranted, Notes = "Test" };
         _db.DoorEvents.Add(doorEvent);
         await _db.SaveChangesAsync();
 
-        var result = await _service.GetAccessLogAsync(doorEvent.Id);
+        var result = await _service.GetAccessLogAsync(doorEvent.Id, UserId);
 
         Assert.NotNull(result);
         Assert.Equal("Test", result.Notes);
@@ -206,17 +221,17 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task GetAccessLogAsync_NonExisting_ReturnsNull()
     {
-        var result = await _service.GetAccessLogAsync(999);
+        var result = await _service.GetAccessLogAsync(999, UserId);
         Assert.Null(result);
     }
 
     [Fact]
     public async Task ProcessAccessRequestAsync_LogsEvent()
     {
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(null, null, 0.1));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -230,12 +245,12 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_InsideSide_SetsExitingDirection()
     {
-        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
         _db.Animals.Add(animal);
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -253,12 +268,12 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_OutsideSide_SetsEnteringDirection()
     {
-        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
         _db.Animals.Add(animal);
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -276,12 +291,12 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task ProcessAccessRequestAsync_NullSide_PreservesBackwardCompat()
     {
-        var animal = new Animal { Name = "Buddy", IsAllowed = true };
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
         _db.Animals.Add(animal);
-        _db.DoorConfigurations.Add(new DoorConfiguration { IsEnabled = true, MinConfidenceThreshold = 0.7 });
+        _db.DoorConfigurations.Add(CreateConfig());
         await _db.SaveChangesAsync();
 
-        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>()))
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
             .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.85));
 
         var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
@@ -299,14 +314,14 @@ public class DoorServiceTests : IDisposable
     [Fact]
     public async Task GetAccessLogsAsync_WithDirectionFilter_FiltersEvents()
     {
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.EntryGranted, Direction = TransitDirection.Entering });
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.ExitGranted, Direction = TransitDirection.Exiting });
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.EntryGranted, Direction = TransitDirection.Entering });
-        _db.DoorEvents.Add(new DoorEvent { EventType = DoorEventType.AccessGranted });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.EntryGranted, Direction = TransitDirection.Entering });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.ExitGranted, Direction = TransitDirection.Exiting });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.EntryGranted, Direction = TransitDirection.Entering });
+        _db.DoorEvents.Add(new DoorEvent { UserId = UserId, EventType = DoorEventType.AccessGranted });
         await _db.SaveChangesAsync();
 
-        var entering = await _service.GetAccessLogsAsync(1, 20, null, "Entering");
-        var exiting = await _service.GetAccessLogsAsync(1, 20, null, "Exiting");
+        var entering = await _service.GetAccessLogsAsync(1, 20, null, "Entering", UserId);
+        var exiting = await _service.GetAccessLogsAsync(1, 20, null, "Exiting", UserId);
 
         Assert.Equal(2, entering.Count());
         Assert.Single(exiting);

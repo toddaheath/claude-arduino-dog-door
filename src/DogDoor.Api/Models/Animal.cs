@@ -6,6 +6,8 @@ public class Animal
 {
     public int Id { get; set; }
 
+    public int UserId { get; set; }
+
     [Required]
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
@@ -19,7 +21,7 @@ public class Animal
 
     public DateTime? UpdatedAt { get; set; }
 
+    public User User { get; set; } = null!;
     public ICollection<AnimalPhoto> Photos { get; set; } = new List<AnimalPhoto>();
-
     public ICollection<DoorEvent> DoorEvents { get; set; } = new List<DoorEvent>();
 }

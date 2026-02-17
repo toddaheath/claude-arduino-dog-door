@@ -1,6 +1,10 @@
+using System.Text;
+using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,11 +15,57 @@ builder.Services.AddDbContext<DogDoorDbContext>(options =>
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
+// JWT Authentication
+var jwtSecretKey = builder.Configuration["JWT:SecretKey"];
+if (!string.IsNullOrEmpty(jwtSecretKey))
+{
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+                ValidateIssuer = !string.IsNullOrEmpty(builder.Configuration["JWT:Issuer"]),
+                ValidIssuer = builder.Configuration["JWT:Issuer"],
+                ValidateAudience = !string.IsNullOrEmpty(builder.Configuration["JWT:Audience"]),
+                ValidAudience = builder.Configuration["JWT:Audience"],
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+}
+else
+{
+    // Fallback for environments without JWT config (e.g., tests override this)
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer();
+}
+
+builder.Services.AddAuthorization();
+
 // Services
+builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<IEmailService, SendGridEmailService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<IPhotoService, PhotoService>();
 builder.Services.AddScoped<IAnimalRecognitionService, AnimalRecognitionService>();
 builder.Services.AddScoped<IDoorService, DoorService>();
+
+// API Versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+}).AddMvc()
+  .AddApiExplorer(options =>
+  {
+      options.GroupNameFormat = "'v'VVV";
+      options.SubstituteApiVersionInUrl = true;
+  });
 
 // Controllers
 builder.Services.AddControllers();
@@ -48,6 +98,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 // Ensure uploads directory exists
@@ -55,11 +107,14 @@ var uploadsPath = Path.Combine(app.Environment.ContentRootPath,
     builder.Configuration.GetValue<string>("PhotoStorage:BasePath") ?? "uploads");
 Directory.CreateDirectory(uploadsPath);
 
-// Ensure database schema exists
+// Run migrations (or EnsureCreated for non-relational, e.g., in-memory test DB)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DogDoorDbContext>();
-    db.Database.EnsureCreated();
+    if (db.Database.IsRelational())
+        await db.Database.MigrateAsync();
+    else
+        await db.Database.EnsureCreatedAsync();
 }
 
 app.Run();

@@ -4,5 +4,5 @@ public record RecognitionResult(int? AnimalId, string? AnimalName, double Confid
 
 public interface IAnimalRecognitionService
 {
-    Task<RecognitionResult> IdentifyAsync(Stream imageStream);
+    Task<RecognitionResult> IdentifyAsync(Stream imageStream, int userId);
 }

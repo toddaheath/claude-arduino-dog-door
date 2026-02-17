@@ -6,6 +6,8 @@ public class DoorConfiguration
 {
     public int Id { get; set; }
 
+    public int UserId { get; set; }
+
     public bool IsEnabled { get; set; } = true;
 
     public bool AutoCloseEnabled { get; set; } = true;
@@ -24,4 +26,6 @@ public class DoorConfiguration
     public string? ApiKey { get; set; }
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public User User { get; set; } = null!;
 }

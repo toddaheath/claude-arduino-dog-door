@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using DogDoor.Api.Controllers;
 using DogDoor.Api.DTOs;
 using DogDoor.Api.Services;
@@ -11,18 +12,28 @@ public class DoorsControllerTests
 {
     private readonly Mock<IDoorService> _mockService;
     private readonly DoorsController _controller;
+    private const int UserId = 1;
 
     public DoorsControllerTests()
     {
         _mockService = new Mock<IDoorService>();
         _controller = new DoorsController(_mockService.Object);
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    new[] { new Claim(ClaimTypes.NameIdentifier, UserId.ToString()) },
+                    "Test"))
+            }
+        };
     }
 
     [Fact]
     public async Task GetStatus_ReturnsOkWithConfiguration()
     {
         var config = new DoorConfigurationDto(true, true, 10, 0.7, false, null, null);
-        _mockService.Setup(s => s.GetConfigurationAsync()).ReturnsAsync(config);
+        _mockService.Setup(s => s.GetConfigurationAsync(UserId)).ReturnsAsync(config);
 
         var result = await _controller.GetStatus();
 
@@ -36,7 +47,7 @@ public class DoorsControllerTests
     {
         var updateDto = new UpdateDoorConfigurationDto(false, null, null, null, null, null, null);
         var updated = new DoorConfigurationDto(false, true, 10, 0.7, false, null, null);
-        _mockService.Setup(s => s.UpdateConfigurationAsync(updateDto)).ReturnsAsync(updated);
+        _mockService.Setup(s => s.UpdateConfigurationAsync(updateDto, UserId)).ReturnsAsync(updated);
 
         var result = await _controller.UpdateConfiguration(updateDto);
 

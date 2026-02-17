@@ -12,15 +12,15 @@ public class AnimalRecognitionService : IAnimalRecognitionService
         _db = db;
     }
 
-    public async Task<RecognitionResult> IdentifyAsync(Stream imageStream)
+    public async Task<RecognitionResult> IdentifyAsync(Stream imageStream, int userId)
     {
         // Compute hash of the incoming camera image
         var imageHash = ComputeHash(imageStream);
 
-        // Compare against all stored animal photo hashes
+        // Compare against all stored animal photo hashes scoped to this user
         var photos = await _db.AnimalPhotos
             .Include(p => p.Animal)
-            .Where(p => p.PHash != null)
+            .Where(p => p.PHash != null && p.Animal.UserId == userId)
             .ToListAsync();
 
         if (photos.Count == 0)

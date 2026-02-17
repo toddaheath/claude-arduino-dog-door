@@ -17,39 +17,41 @@ public class AnimalService : IAnimalService
         _mapper = mapper;
     }
 
-    public async Task<IEnumerable<AnimalDto>> GetAllAsync()
+    public async Task<IEnumerable<AnimalDto>> GetAllAsync(int userId)
     {
         var animals = await _db.Animals
             .Include(a => a.Photos)
+            .Where(a => a.UserId == userId)
             .OrderBy(a => a.Name)
             .ToListAsync();
 
         return _mapper.Map<IEnumerable<AnimalDto>>(animals);
     }
 
-    public async Task<AnimalDto?> GetByIdAsync(int id)
+    public async Task<AnimalDto?> GetByIdAsync(int id, int userId)
     {
         var animal = await _db.Animals
             .Include(a => a.Photos)
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
 
         return animal is null ? null : _mapper.Map<AnimalDto>(animal);
     }
 
-    public async Task<AnimalDto> CreateAsync(CreateAnimalDto dto)
+    public async Task<AnimalDto> CreateAsync(CreateAnimalDto dto, int userId)
     {
         var animal = _mapper.Map<Animal>(dto);
+        animal.UserId = userId;
         _db.Animals.Add(animal);
         await _db.SaveChangesAsync();
 
         return _mapper.Map<AnimalDto>(animal);
     }
 
-    public async Task<AnimalDto?> UpdateAsync(int id, UpdateAnimalDto dto)
+    public async Task<AnimalDto?> UpdateAsync(int id, UpdateAnimalDto dto, int userId)
     {
         var animal = await _db.Animals
             .Include(a => a.Photos)
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
 
         if (animal is null) return null;
 
@@ -63,9 +65,9 @@ public class AnimalService : IAnimalService
         return _mapper.Map<AnimalDto>(animal);
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<bool> DeleteAsync(int id, int userId)
     {
-        var animal = await _db.Animals.FindAsync(id);
+        var animal = await _db.Animals.FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
         if (animal is null) return false;
 
         _db.Animals.Remove(animal);
