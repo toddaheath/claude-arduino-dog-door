@@ -20,5 +20,8 @@ public class MappingProfile : Profile
             .ForCtorParam("Direction", opt => opt.MapFrom(src => src.Direction != null ? src.Direction.ToString() : null));
 
         CreateMap<DoorConfiguration, DoorConfigurationDto>();
+
+        CreateMap<User, UserProfileDto>();
+        CreateMap<User, UserSummaryDto>();
     }
 }

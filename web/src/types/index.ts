@@ -68,3 +68,52 @@ export interface AccessResponse {
   reason: string | null;
   direction: string | null;
 }
+
+// Auth
+export interface UserSummary {
+  id: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  user: UserSummary;
+}
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  mobilePhone: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  emailVerified: boolean;
+  createdAt: string;
+}
+
+export interface Guest {
+  userId: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  invitedAt: string;
+  acceptedAt: string | null;
+}
+
+export interface Invitation {
+  id: number;
+  inviteeEmail: string;
+  createdAt: string;
+  expiresAt: string;
+  isAccepted: boolean;
+}

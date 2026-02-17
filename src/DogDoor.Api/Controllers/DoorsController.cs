@@ -1,11 +1,15 @@
+using System.Security.Claims;
+using Asp.Versioning;
 using DogDoor.Api.DTOs;
 using DogDoor.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DogDoor.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/doors")]
 public class DoorsController : ControllerBase
 {
     private readonly IDoorService _doorService;
@@ -15,6 +19,9 @@ public class DoorsController : ControllerBase
         _doorService = doorService;
     }
 
+    private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    // No auth — ESP32 identifies via API key
     [HttpPost("access-request")]
     public async Task<ActionResult<AccessResponseDto>> AccessRequest(
         IFormFile image,
@@ -30,17 +37,19 @@ public class DoorsController : ControllerBase
     }
 
     [HttpGet("status")]
+    [Authorize]
     public async Task<ActionResult<DoorConfigurationDto>> GetStatus()
     {
-        var config = await _doorService.GetConfigurationAsync();
+        var config = await _doorService.GetConfigurationAsync(CurrentUserId);
         return Ok(config);
     }
 
     [HttpPut("configuration")]
+    [Authorize]
     public async Task<ActionResult<DoorConfigurationDto>> UpdateConfiguration(
         [FromBody] UpdateDoorConfigurationDto dto)
     {
-        var config = await _doorService.UpdateConfigurationAsync(dto);
+        var config = await _doorService.UpdateConfigurationAsync(dto, CurrentUserId);
         return Ok(config);
     }
 }

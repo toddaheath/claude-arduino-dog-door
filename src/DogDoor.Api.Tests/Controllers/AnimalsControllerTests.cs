@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using DogDoor.Api.Controllers;
 using DogDoor.Api.DTOs;
 using DogDoor.Api.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 
@@ -9,12 +11,29 @@ namespace DogDoor.Api.Tests.Controllers;
 public class AnimalsControllerTests
 {
     private readonly Mock<IAnimalService> _mockService;
+    private readonly Mock<IUserService> _mockUserService;
     private readonly AnimalsController _controller;
+    private const int UserId = 1;
 
     public AnimalsControllerTests()
     {
         _mockService = new Mock<IAnimalService>();
-        _controller = new AnimalsController(_mockService.Object);
+        _mockUserService = new Mock<IUserService>();
+
+        // Default: no asOwner — return current userId
+        _mockUserService.Setup(s => s.ResolveEffectiveUserIdAsync(UserId, null))
+            .ReturnsAsync(UserId);
+
+        _controller = new AnimalsController(_mockService.Object, _mockUserService.Object);
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    new[] { new Claim(ClaimTypes.NameIdentifier, UserId.ToString()) },
+                    "Test"))
+            }
+        };
     }
 
     [Fact]
@@ -25,7 +44,7 @@ public class AnimalsControllerTests
             new(1, "Buddy", "Golden Retriever", true, DateTime.UtcNow, null, 2),
             new(2, "Max", "German Shepherd", true, DateTime.UtcNow, null, 0)
         };
-        _mockService.Setup(s => s.GetAllAsync()).ReturnsAsync(animals);
+        _mockService.Setup(s => s.GetAllAsync(UserId)).ReturnsAsync(animals);
 
         var result = await _controller.GetAll();
 
@@ -38,7 +57,7 @@ public class AnimalsControllerTests
     public async Task GetById_ExistingId_ReturnsOk()
     {
         var animal = new AnimalDto(1, "Buddy", "Golden Retriever", true, DateTime.UtcNow, null, 2);
-        _mockService.Setup(s => s.GetByIdAsync(1)).ReturnsAsync(animal);
+        _mockService.Setup(s => s.GetByIdAsync(1, UserId)).ReturnsAsync(animal);
 
         var result = await _controller.GetById(1);
 
@@ -50,7 +69,7 @@ public class AnimalsControllerTests
     [Fact]
     public async Task GetById_NonExistingId_ReturnsNotFound()
     {
-        _mockService.Setup(s => s.GetByIdAsync(99)).ReturnsAsync((AnimalDto?)null);
+        _mockService.Setup(s => s.GetByIdAsync(99, UserId)).ReturnsAsync((AnimalDto?)null);
 
         var result = await _controller.GetById(99);
 
@@ -62,7 +81,7 @@ public class AnimalsControllerTests
     {
         var createDto = new CreateAnimalDto("Buddy", "Golden Retriever", true);
         var createdAnimal = new AnimalDto(1, "Buddy", "Golden Retriever", true, DateTime.UtcNow, null, 0);
-        _mockService.Setup(s => s.CreateAsync(createDto)).ReturnsAsync(createdAnimal);
+        _mockService.Setup(s => s.CreateAsync(createDto, UserId)).ReturnsAsync(createdAnimal);
 
         var result = await _controller.Create(createDto);
 
@@ -77,7 +96,7 @@ public class AnimalsControllerTests
     {
         var updateDto = new UpdateAnimalDto("Buddy Updated", null, null);
         var updated = new AnimalDto(1, "Buddy Updated", "Golden Retriever", true, DateTime.UtcNow, DateTime.UtcNow, 0);
-        _mockService.Setup(s => s.UpdateAsync(1, updateDto)).ReturnsAsync(updated);
+        _mockService.Setup(s => s.UpdateAsync(1, updateDto, UserId)).ReturnsAsync(updated);
 
         var result = await _controller.Update(1, updateDto);
 
@@ -90,7 +109,7 @@ public class AnimalsControllerTests
     public async Task Update_NonExistingId_ReturnsNotFound()
     {
         var updateDto = new UpdateAnimalDto("Buddy Updated", null, null);
-        _mockService.Setup(s => s.UpdateAsync(99, updateDto)).ReturnsAsync((AnimalDto?)null);
+        _mockService.Setup(s => s.UpdateAsync(99, updateDto, UserId)).ReturnsAsync((AnimalDto?)null);
 
         var result = await _controller.Update(99, updateDto);
 
@@ -100,7 +119,7 @@ public class AnimalsControllerTests
     [Fact]
     public async Task Delete_ExistingId_ReturnsNoContent()
     {
-        _mockService.Setup(s => s.DeleteAsync(1)).ReturnsAsync(true);
+        _mockService.Setup(s => s.DeleteAsync(1, UserId)).ReturnsAsync(true);
 
         var result = await _controller.Delete(1);
 
@@ -110,7 +129,7 @@ public class AnimalsControllerTests
     [Fact]
     public async Task Delete_NonExistingId_ReturnsNotFound()
     {
-        _mockService.Setup(s => s.DeleteAsync(99)).ReturnsAsync(false);
+        _mockService.Setup(s => s.DeleteAsync(99, UserId)).ReturnsAsync(false);
 
         var result = await _controller.Delete(99);
 

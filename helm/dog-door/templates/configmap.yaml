@@ -5,6 +5,10 @@ metadata:
 data:
   ASPNETCORE_ENVIRONMENT: {{ .Values.config.aspnetcoreEnvironment | quote }}
   PhotoStorage__BasePath: {{ .Values.config.photoStoragePath | quote }}
+  JWT__Issuer: {{ .Values.config.jwtIssuer | quote }}
+  JWT__Audience: {{ .Values.config.jwtAudience | quote }}
+  SendGrid__FromEmail: {{ .Values.config.sendgridFromEmail | quote }}
+  SendGrid__FromName: {{ .Values.config.sendgridFromName | quote }}
   {{- if .Values.config.corsOrigins }}
   Cors__AllowedOrigins__0: {{ .Values.config.corsOrigins | quote }}
   {{- end }}

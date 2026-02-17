@@ -33,6 +33,8 @@ public class DoorEvent
 {
     public int Id { get; set; }
 
+    public int UserId { get; set; }
+
     public int? AnimalId { get; set; }
 
     public DoorEventType EventType { get; set; }
@@ -51,5 +53,6 @@ public class DoorEvent
 
     public TransitDirection? Direction { get; set; }
 
+    public User? User { get; set; }
     public Animal? Animal { get; set; }
 }

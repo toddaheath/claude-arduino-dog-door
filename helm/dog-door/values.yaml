@@ -61,8 +61,14 @@ config:
   aspnetcoreEnvironment: Production
   photoStoragePath: /app/uploads
   corsOrigins: ""
+  jwtIssuer: "DogDoorApi"
+  jwtAudience: "DogDoorClient"
+  sendgridFromEmail: "noreply@example.com"
+  sendgridFromName: "Smart Dog Door"
 
 secret:
   postgresUser: dogdoor
   postgresPassword: dogdoor
   postgresDb: dogdoor
+  jwtSecretKey: "change-me-to-a-long-random-secret-key-at-least-32-chars"
+  sendgridApiKey: ""

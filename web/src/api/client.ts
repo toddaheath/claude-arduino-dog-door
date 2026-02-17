@@ -9,7 +9,15 @@ import type {
   UpdateDoorConfiguration,
 } from '../types';
 
-const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL || ''}/api` });
+const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL || ''}/api/v1` });
+
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // Animals
 const _getAnimals = () => api.get<Animal[]>('/animals').then(r => r.data);
