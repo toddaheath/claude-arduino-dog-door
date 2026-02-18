@@ -67,6 +67,9 @@ builder.Services.AddApiVersioning(options =>
       options.SubstituteApiVersionInUrl = true;
   });
 
+// Health checks
+builder.Services.AddHealthChecks();
+
 // Controllers
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -100,6 +103,7 @@ app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHealthChecks("/healthz").AllowAnonymous();
 app.MapControllers();
 
 // Ensure uploads directory exists
