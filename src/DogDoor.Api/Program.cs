@@ -128,6 +128,9 @@ using (var scope = app.Services.CreateScope())
             );
             """);
 
+        // If Animals exists but history is empty, the DB was created by EnsureCreated
+        // (pre-migration). Mark InitialCreate as applied so MigrateAsync skips it and
+        // only runs AddMultiUserSupport, which uses IF NOT EXISTS SQL throughout.
         await db.Database.ExecuteSqlRawAsync("""
             INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
             SELECT '20260217200700_InitialCreate', '9.0.13'
@@ -135,6 +138,21 @@ using (var scope = app.Services.CreateScope())
               AND EXISTS (
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name = 'Animals'
+              );
+            """);
+
+        // If Users also already exists (e.g. a dev DB that ran EnsureCreated after the
+        // multi-user models were added), mark AddMultiUserSupport applied too.
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            SELECT '20260218000000_AddMultiUserSupport', '9.0.13'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "__EFMigrationsHistory"
+                WHERE "MigrationId" = '20260218000000_AddMultiUserSupport'
+              )
+              AND EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'Users'
               );
             """);
 
