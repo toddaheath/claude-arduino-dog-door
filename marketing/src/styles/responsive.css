@@ -63,6 +63,18 @@
   .hardware__content {
     grid-template-columns: 1fr;
   }
+
+  .screenshots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .privacy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quickstart-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 480px) {
@@ -104,5 +116,9 @@
 
   .opensource__link {
     text-align: center;
+  }
+
+  .quickstart-grid {
+    grid-template-columns: 1fr;
   }
 }
