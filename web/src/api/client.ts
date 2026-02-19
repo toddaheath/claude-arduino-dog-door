@@ -19,6 +19,19 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('currentUser');
+      window.location.replace('/login');
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Animals
 const _getAnimals = () => api.get<Animal[]>('/animals').then(r => r.data);
 
