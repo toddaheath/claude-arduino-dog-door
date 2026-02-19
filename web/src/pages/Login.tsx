@@ -67,7 +67,7 @@ export default function Login() {
         <Link to="/forgot-username" style={{ color: '#1a1a2e' }}>Forgot email?</Link>
       </div>
       <div style={{ marginTop: 8, fontSize: 14 }}>
-        Don't have an account? <Link to="/register" style={{ color: '#1a1a2e' }}>Register</Link>
+        Don&apos;t have an account? <Link to="/register" style={{ color: '#1a1a2e' }}>Register</Link>
       </div>
     </div>
   );

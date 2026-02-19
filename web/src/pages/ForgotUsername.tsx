@@ -27,7 +27,7 @@ export default function ForgotUsername() {
       <div style={{ maxWidth: 400, margin: '48px auto', padding: '0 24px' }}>
         <h2 style={{ marginBottom: 16 }}>Check Your Email</h2>
         <p style={{ color: '#555', marginBottom: 24 }}>
-          If an account exists for <strong>{email}</strong>, we've sent a reminder with your account information.
+          If an account exists for <strong>{email}</strong>, we&apos;ve sent a reminder with your account information.
         </p>
         <Link to="/login" style={{ color: '#1a1a2e' }}>Back to sign in</Link>
       </div>
@@ -38,7 +38,7 @@ export default function ForgotUsername() {
     <div style={{ maxWidth: 400, margin: '48px auto', padding: '0 24px' }}>
       <h2 style={{ marginBottom: 8 }}>Forgot Email?</h2>
       <p style={{ color: '#555', marginBottom: 24, fontSize: 14 }}>
-        Enter the email address you may have used to register and we'll send you a reminder.
+        Enter the email address you may have used to register and we&apos;ll send you a reminder.
       </p>
       {error && (
         <div style={{ background: '#fee', border: '1px solid #faa', padding: 12, borderRadius: 6, marginBottom: 16, color: '#c00' }}>

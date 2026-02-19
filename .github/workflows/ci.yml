@@ -86,6 +86,27 @@ jobs:
       - name: Run unit tests
         run: pio test -d firmware -e native
 
+  helm:
+    name: Helm Charts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint Helm chart
+        run: helm lint helm/dog-door
+
+      - name: Lint with staging values
+        run: helm lint helm/dog-door --values helm/dog-door/values-staging.yaml
+
+      - name: Lint with production values
+        run: helm lint helm/dog-door --values helm/dog-door/values-production.yaml
+
+      - name: Template render check
+        run: helm template dog-door helm/dog-door --values helm/dog-door/values-staging.yaml > /dev/null
+
   marketing:
     name: Marketing (React)
     runs-on: ubuntu-latest
