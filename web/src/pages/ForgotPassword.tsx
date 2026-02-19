@@ -38,7 +38,7 @@ export default function ForgotPassword() {
     <div style={{ maxWidth: 400, margin: '48px auto', padding: '0 24px' }}>
       <h2 style={{ marginBottom: 8 }}>Reset Password</h2>
       <p style={{ color: '#555', marginBottom: 24, fontSize: 14 }}>
-        Enter your email address and we'll send you a link to reset your password.
+        Enter your email address and we&apos;ll send you a link to reset your password.
       </p>
       {error && (
         <div style={{ background: '#fee', border: '1px solid #faa', padding: 12, borderRadius: 6, marginBottom: 16, color: '#c00' }}>
