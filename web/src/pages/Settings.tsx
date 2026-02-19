@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { getDoorStatus, updateDoorConfig } from '../api/client';
 import { useApi } from '../hooks/useApi';
+import { Skeleton } from '../components/Skeleton';
+import { useToast } from '../contexts/ToastContext';
 
 export default function Settings() {
   const { data: config, loading, error, reload } = useApi(getDoorStatus);
+  const { addToast } = useToast();
 
   const [isEnabled, setIsEnabled] = useState(true);
   const [autoClose, setAutoClose] = useState(true);
@@ -40,17 +43,28 @@ export default function Settings() {
         nightModeEnd: nightMode ? nightEnd : undefined,
       });
       reload();
+      addToast('Settings saved', 'success');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Save failed');
+      addToast(err instanceof Error ? err.message : 'Save failed', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p style={{ color: 'red' }}>Error: {error}</p>;
+  if (loading) {
+    return (
+      <div>
+        <h2>Door Settings</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 500 }}>
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} height={36} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-  const fieldStyle = { padding: 8, borderRadius: 4, border: '1px solid #444', background: '#1a1a2e', color: '#fff', width: 200 };
+  if (error) return <div className="alert alert--error">Error: {error}</div>;
 
   return (
     <div>
@@ -66,20 +80,21 @@ export default function Settings() {
           Auto Close
         </label>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          Auto Close Delay (seconds)
+        <div className="form-field">
+          <label className="form-label">Auto Close Delay (seconds)</label>
           <input
             type="number"
             min={1}
             max={120}
             value={autoCloseDelay}
             onChange={e => setAutoCloseDelay(Number(e.target.value))}
-            style={fieldStyle}
+            className="form-input"
+            style={{ width: 200 }}
           />
-        </label>
+        </div>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          Minimum Confidence Threshold ({(confidence * 100).toFixed(0)}%)
+        <div className="form-field">
+          <label className="form-label">Minimum Confidence Threshold ({(confidence * 100).toFixed(0)}%)</label>
           <input
             type="range"
             min={0}
@@ -89,7 +104,7 @@ export default function Settings() {
             onChange={e => setConfidence(Number(e.target.value))}
             style={{ width: 200 }}
           />
-        </label>
+        </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input type="checkbox" checked={nightMode} onChange={e => setNightMode(e.target.checked)} />
@@ -98,14 +113,14 @@ export default function Settings() {
 
         {nightMode && (
           <div style={{ display: 'flex', gap: 16 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              Start
-              <input type="time" value={nightStart} onChange={e => setNightStart(e.target.value)} style={fieldStyle} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              End
-              <input type="time" value={nightEnd} onChange={e => setNightEnd(e.target.value)} style={fieldStyle} />
-            </label>
+            <div className="form-field">
+              <label className="form-label">Start</label>
+              <input type="time" value={nightStart} onChange={e => setNightStart(e.target.value)} className="form-input" style={{ width: 140 }} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">End</label>
+              <input type="time" value={nightEnd} onChange={e => setNightEnd(e.target.value)} className="form-input" style={{ width: 140 }} />
+            </div>
           </div>
         )}
 
@@ -114,20 +129,20 @@ export default function Settings() {
         </button>
       </form>
 
-      <div style={{ marginTop: 32, padding: 16, background: '#1a1a2e', borderRadius: 8, maxWidth: 500 }}>
+      <div style={{ marginTop: 32, padding: 16, background: 'var(--color-surface)', borderRadius: 8, maxWidth: 500, border: '1px solid var(--color-border)' }}>
         <h3 style={{ margin: '0 0 12px 0', fontSize: 16 }}>System Info</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14, color: '#ccc' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Dual-Sided Detection</span>
-            <span style={{ color: '#4fc3f7', fontWeight: 600 }}>Supported</span>
+            <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>Supported</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Direction Tracking</span>
-            <span style={{ color: '#4fc3f7', fontWeight: 600 }}>Entering / Exiting</span>
+            <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>Entering / Exiting</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Camera Sides</span>
-            <span style={{ color: '#999' }}>Inside + Outside</span>
+            <span style={{ color: 'var(--color-muted)' }}>Inside + Outside</span>
           </div>
         </div>
       </div>

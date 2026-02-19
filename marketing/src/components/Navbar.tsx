@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 
 const links = [
   { label: 'Features', href: '#features' },
+  { label: 'Screenshots', href: '#screenshots' },
   { label: 'How It Works', href: '#how-it-works' },
+  { label: 'Quick Start', href: '#quick-start' },
+  { label: 'Privacy', href: '#privacy' },
   { label: 'Hardware', href: '#hardware' },
-  { label: 'Tech Stack', href: '#tech-stack' },
+  { label: 'FAQ', href: '#faq' },
   { label: 'GitHub', href: 'https://github.com/toddlheath/claude-arduino-dog-door' },
 ]
 

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { getAccessLogs } from '../api/client';
 import { useApi } from '../hooks/useApi';
+import { SkeletonRow } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
 
 const eventTypeColors: Record<string, string> = {
   AccessGranted: '#2e7d32',
@@ -19,14 +21,7 @@ const directionBadge = (direction: string | null) => {
   if (!direction) return null;
   const isEntering = direction === 'Entering';
   return (
-    <span style={{
-      padding: '2px 8px',
-      borderRadius: 12,
-      fontSize: 12,
-      fontWeight: 600,
-      background: isEntering ? '#1565c0' : '#e65100',
-      color: '#fff',
-    }}>
+    <span className={`badge ${isEntering ? 'badge--info' : 'badge--unknown'}`}>
       {isEntering ? 'IN' : 'OUT'}
     </span>
   );
@@ -47,27 +42,15 @@ export default function AccessLog() {
 
   return (
     <div>
-      <h2>Access Log</h2>
+      <div className="page-header">
+        <h2 className="page-title">Access Log</h2>
+      </div>
 
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{
-          padding: '6px 14px',
-          borderRadius: 8,
-          background: '#1a237e',
-          color: '#90caf9',
-          fontSize: 13,
-          fontWeight: 600,
-        }}>
+      <div className="stat-bar">
+        <div className="stat-chip" style={{ background: '#1a237e', color: '#90caf9' }}>
           Entries: {enteringCount}
         </div>
-        <div style={{
-          padding: '6px 14px',
-          borderRadius: 8,
-          background: '#bf360c',
-          color: '#ffcc80',
-          fontSize: 13,
-          fontWeight: 600,
-        }}>
+        <div className="stat-chip" style={{ background: '#bf360c', color: '#ffcc80' }}>
           Exits: {exitingCount}
         </div>
       </div>
@@ -76,7 +59,8 @@ export default function AccessLog() {
         <select
           value={filter}
           onChange={e => { setFilter(e.target.value); setPage(1); }}
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #444', background: '#1a1a2e', color: '#fff' }}
+          className="form-input"
+          style={{ width: 'auto' }}
         >
           <option value="">All Events</option>
           <option value="AccessGranted">Access Granted</option>
@@ -94,7 +78,8 @@ export default function AccessLog() {
         <select
           value={directionFilter}
           onChange={e => { setDirectionFilter(e.target.value); setPage(1); }}
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #444', background: '#1a1a2e', color: '#fff' }}
+          className="form-input"
+          style={{ width: 'auto' }}
         >
           <option value="">All Directions</option>
           <option value="Entering">Entering</option>
@@ -102,53 +87,53 @@ export default function AccessLog() {
         </select>
       </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+      {error && <div className="alert alert--error">{error}</div>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="table">
         <thead>
-          <tr style={{ borderBottom: '2px solid #333', textAlign: 'left' }}>
-            <th style={{ padding: 8 }}>Time</th>
-            <th style={{ padding: 8 }}>Event</th>
-            <th style={{ padding: 8 }}>Direction</th>
-            <th style={{ padding: 8 }}>Animal</th>
-            <th style={{ padding: 8 }}>Confidence</th>
-            <th style={{ padding: 8 }}>Notes</th>
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Direction</th>
+            <th>Animal</th>
+            <th>Confidence</th>
+            <th>Notes</th>
           </tr>
         </thead>
         <tbody>
-          {logs?.map(log => (
-            <tr key={log.id} style={{ borderBottom: '1px solid #222' }}>
-              <td style={{ padding: 8, fontSize: 13 }}>
-                {new Date(log.timestamp).toLocaleString()}
-              </td>
-              <td style={{ padding: 8 }}>
-                <span style={{
-                  padding: '2px 8px',
-                  borderRadius: 12,
-                  fontSize: 12,
-                  background: eventTypeColors[log.eventType] || '#555',
-                  color: '#fff',
-                }}>
-                  {log.eventType}
-                </span>
-              </td>
-              <td style={{ padding: 8 }}>
-                {directionBadge(log.direction)}
-              </td>
-              <td style={{ padding: 8 }}>{log.animalName || '-'}</td>
-              <td style={{ padding: 8 }}>
-                {log.confidenceScore != null ? `${(log.confidenceScore * 100).toFixed(0)}%` : '-'}
-              </td>
-              <td style={{ padding: 8, color: '#999', fontSize: 13 }}>{log.notes || '-'}</td>
-            </tr>
-          ))}
-          {logs?.length === 0 && (
+          {loading ? (
+            [...Array(10)].map((_, i) => <SkeletonRow key={i} />)
+          ) : logs && logs.length === 0 ? (
             <tr>
-              <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#666' }}>
-                No events found.
+              <td colSpan={6}>
+                <EmptyState icon="📋" title="No events yet" message="Door events will appear here once your system is active." />
               </td>
             </tr>
+          ) : (
+            logs?.map(log => (
+              <tr key={log.id}>
+                <td style={{ fontSize: 13 }}>
+                  {new Date(log.timestamp).toLocaleString()}
+                </td>
+                <td>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    fontSize: 12,
+                    background: eventTypeColors[log.eventType] || '#555',
+                    color: '#fff',
+                  }}>
+                    {log.eventType}
+                  </span>
+                </td>
+                <td>{directionBadge(log.direction)}</td>
+                <td>{log.animalName || '-'}</td>
+                <td>
+                  {log.confidenceScore != null ? `${(log.confidenceScore * 100).toFixed(0)}%` : '-'}
+                </td>
+                <td style={{ color: 'var(--color-muted)', fontSize: 13 }}>{log.notes || '-'}</td>
+              </tr>
+            ))
           )}
         </tbody>
       </table>
