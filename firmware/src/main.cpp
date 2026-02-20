@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include "config.h"
 #include "sensors.h"
 #include "camera.h"
@@ -6,6 +7,10 @@
 #include "door_control.h"
 #include "wifi_manager.h"
 #include "api_client.h"
+#include "offline_queue.h"
+#include "network_manager.h"
+#include "power_monitor.h"
+#include "ble_server.h"
 
 static unsigned long last_detection_time = 0;
 static unsigned long door_open_time = 0;
@@ -25,7 +30,6 @@ void setup() {
 
     if (!camera_init()) {
         Serial.println("[FAIL] Camera initialization failed!");
-        // Continue without camera - door will stay closed
     } else {
         Serial.println("[OK] Camera initialized");
     }
@@ -36,10 +40,24 @@ void setup() {
         Serial.println("[OK] TFLite detection initialized");
     }
 
+    // Init LittleFS and offline queue before WiFi (BLE provisioning needs it)
+    offline_queue_init();
+
+    // Start BLE early so the user can provision WiFi credentials before connecting
+    ble_server_init();
+
     if (!wifi_connect()) {
         Serial.println("[WARN] WiFi connection failed - will retry in loop");
     } else {
         Serial.println("[OK] WiFi connected: " + wifi_get_ip());
+    }
+
+    network_manager_init();
+    power_monitor_init();
+
+    if (network_manager_is_connected() && offline_queue_size() > 0) {
+        int flushed = offline_queue_flush(API_BASE_URL, API_FIRMWARE_EVENT_ENDPOINT);
+        Serial.printf("[OK] Flushed %d queued events\n", flushed);
     }
 
     led_off();
@@ -47,8 +65,44 @@ void setup() {
 }
 
 void loop() {
-    // Ensure WiFi connectivity
-    wifi_ensure_connected();
+    // BLE: handle commands and WiFi provisioning
+    ble_server_update();
+
+    bool openCmd;
+    if (ble_server_get_command(&openCmd)) {
+        if (openCmd) {
+            door_open();
+            api_post_firmware_event(API_KEY, "DoorOpened", nullptr, -1);
+        } else {
+            door_close();
+            api_post_firmware_event(API_KEY, "DoorClosed", nullptr, -1);
+        }
+    }
+
+    char newSsid[64], newPass[64];
+    if (ble_server_get_wifi_update(newSsid, newPass, 64)) {
+        Serial.printf("[BLE] New WiFi credentials: %s\n", newSsid);
+        WiFi.disconnect();
+        wifi_connect();
+    }
+
+    // Monitor power/battery state
+    power_monitor_update(API_KEY, API_BASE_URL);
+
+    // Ensure network connectivity
+    network_manager_ensure_connected();
+
+    // Flush queued events when network is available
+    if (network_manager_is_connected() && offline_queue_size() > 0) {
+        offline_queue_flush(API_BASE_URL, API_FIRMWARE_EVENT_ENDPOINT);
+    }
+
+    // Update BLE status characteristic
+    ble_server_set_status(
+        door_is_open(),
+        "active",
+        network_manager_get_transport() == NetworkTransport::WiFi,
+        power_monitor_battery_percent());
 
     // Handle auto-close timing
     if (waiting_for_close && door_is_open()) {
@@ -57,25 +111,25 @@ void loop() {
                 if (door_close()) {
                     waiting_for_close = false;
                     Serial.println("Door auto-closed");
+                    api_post_firmware_event(API_KEY, "DoorClosed", nullptr, -1);
                 }
             } else {
-                // Reset timer - animal still in doorway
                 door_open_time = millis();
             }
         }
-        return;  // Don't process new detections while door is open
+        return;
     }
 
     // Stage 1: Check radar for motion
     if (!radar_detected()) {
-        delay(100);  // No motion - sleep briefly
+        delay(100);
         return;
     }
 
     // Stage 2: Confirm proximity with ultrasonic
     float distance = ultrasonic_distance_cm();
     if (distance < 0 || distance > ULTRASONIC_TRIGGER_DISTANCE_CM) {
-        return;  // Motion detected but nothing close enough
+        return;
     }
 
     // Cooldown check
@@ -109,16 +163,7 @@ void loop() {
     }
 
     // Stage 5: Send to API for dog identification
-    if (!wifi_is_connected()) {
-        Serial.println("WiFi not connected - cannot identify dog");
-        camera_release(fb);
-        led_deny();
-        delay(1000);
-        led_off();
-        return;
-    }
-
-    AccessResponse response = api_request_access(fb, THIS_SIDE);
+    AccessResponse response = api_request_access_direct(fb, THIS_SIDE);
     camera_release(fb);
     last_detection_time = millis();
 
@@ -138,6 +183,9 @@ void loop() {
         if (door_open()) {
             door_open_time = millis();
             waiting_for_close = true;
+            api_post_firmware_event(API_KEY, "DoorOpened", nullptr, -1);
+        } else {
+            api_post_firmware_event(API_KEY, "DoorObstructed", "open", -1);
         }
     } else {
         Serial.printf("Access DENIED: %s (direction: %s)\n",
