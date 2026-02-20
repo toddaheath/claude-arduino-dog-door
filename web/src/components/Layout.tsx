@@ -11,6 +11,7 @@ const authedNavItems = [
   { path: '/animals', label: 'Animals' },
   { path: '/access-log', label: 'Access Log' },
   { path: '/settings', label: 'Settings' },
+  { path: '/notifications', label: 'Notifications' },
 ];
 
 export default function Layout() {

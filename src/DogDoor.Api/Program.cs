@@ -53,6 +53,9 @@ builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<IPhotoService, PhotoService>();
 builder.Services.AddScoped<IAnimalRecognitionService, AnimalRecognitionService>();
 builder.Services.AddScoped<IDoorService, DoorService>();
+builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationPreferencesService, NotificationPreferencesService>();
 
 // API Versioning
 builder.Services.AddApiVersioning(options =>
@@ -153,6 +156,21 @@ using (var scope = app.Services.CreateScope())
               AND EXISTS (
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name = 'Users'
+              );
+            """);
+
+        // If NotificationPreferences already exists (EnsureCreated after this model was added),
+        // mark AddNotificationPreferences as applied so MigrateAsync skips it.
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            SELECT '20260220140432_AddNotificationPreferences', '9.0.13'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "__EFMigrationsHistory"
+                WHERE "MigrationId" = '20260220140432_AddNotificationPreferences'
+              )
+              AND EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'NotificationPreferences'
               );
             """);
 

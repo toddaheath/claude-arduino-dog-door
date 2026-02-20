@@ -23,5 +23,7 @@ public class MappingProfile : Profile
 
         CreateMap<User, UserProfileDto>();
         CreateMap<User, UserSummaryDto>();
+
+        CreateMap<NotificationPreferences, NotificationPreferencesDto>();
     }
 }

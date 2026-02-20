@@ -83,4 +83,31 @@
 // ===== TFLite Configuration =====
 #define TFLITE_ARENA_SIZE 96 * 1024  // 96KB tensor arena
 
+// ===== Power Monitor (voltage divider R1=10kΩ, R2=3.3kΩ) =====
+#define PIN_POWER_ADC 34           // ADC1_CH6 input-only pin
+#define PIN_POWER_DETECT 35        // HIGH=main power present
+#define BATTERY_LOW_THRESHOLD_PCT 20
+#define BATTERY_CHARGED_THRESHOLD_PCT 95
+#define BATTERY_FULL_VOLTS 12.6f
+#define BATTERY_EMPTY_VOLTS 10.5f
+#define POWER_VDIV_RATIO 4.03f     // (10000+3300)/3300
+
+// ===== Cellular (A7670E on UART2) =====
+#define CELLULAR_RX_PIN 16
+#define CELLULAR_TX_PIN 17
+#define CELLULAR_BAUD_RATE 115200
+#define CELLULAR_TIMEOUT_MS 15000
+#define CELLULAR_APN "your.apn.here"
+
+// ===== BLE (ESP32 built-in) =====
+#define BLE_SERVICE_UUID      "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define BLE_STATUS_CHAR_UUID  "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define BLE_COMMAND_CHAR_UUID "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+#define BLE_WIFI_CHAR_UUID    "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
+#define BLE_DEVICE_NAME "SmartDogDoor"
+
+// ===== Offline Queue =====
+#define OFFLINE_QUEUE_MAX_EVENTS 50
+#define API_FIRMWARE_EVENT_ENDPOINT "/api/v1/doors/firmware-event"
+
 #endif // CONFIG_H
