@@ -11,4 +11,5 @@ public interface IDoorService
     Task<IEnumerable<DoorEventDto>> GetAccessLogsAsync(int page, int pageSize, string? eventType, string? direction, int userId);
     Task<DoorEventDto?> GetAccessLogAsync(int id, int userId);
     Task RecordFirmwareEventAsync(string? apiKey, DoorEventType eventType, string? notes, double? batteryVoltage);
+    Task RecordApproachPhotoAsync(Stream imageStream, string? apiKey, string? side);
 }

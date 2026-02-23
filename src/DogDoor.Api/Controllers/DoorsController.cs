@@ -54,6 +54,21 @@ public class DoorsController : ControllerBase
         return Ok(config);
     }
 
+    // No auth — ESP32 identifies via API key in form body
+    [HttpPost("approach-photo")]
+    public async Task<IActionResult> ApproachPhoto(
+        IFormFile image,
+        [FromForm] string? apiKey,
+        [FromForm] string? side)
+    {
+        if (image.Length == 0)
+            return BadRequest("Image is required");
+
+        using var stream = image.OpenReadStream();
+        await _doorService.RecordApproachPhotoAsync(stream, apiKey, side);
+        return NoContent();
+    }
+
     // No auth — ESP32 identifies via API key
     [HttpPost("firmware-event")]
     public async Task<IActionResult> FirmwareEvent([FromBody] FirmwareEventDto dto)

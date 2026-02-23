@@ -11,5 +11,6 @@ public record DoorEventDto(
     string? Notes,
     DateTime Timestamp,
     string? Side,
-    string? Direction
+    string? Direction,
+    string? ImageUrl
 );

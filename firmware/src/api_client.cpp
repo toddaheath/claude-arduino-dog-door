@@ -185,6 +185,64 @@ AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side) {
     return response;
 }
 
+bool api_post_approach_photo(camera_fb_t* fb, const char* side) {
+    if (!fb || !fb->buf || fb->len == 0) return false;
+
+    if (network_manager_get_transport() != NetworkTransport::WiFi) {
+        // No network — skip approach photo upload (not queued; approach events are best-effort)
+        return false;
+    }
+
+    HTTPClient http;
+    String url = String(API_BASE_URL) + String(API_APPROACH_ENDPOINT);
+    http.begin(url);
+    http.setTimeout(API_TIMEOUT_MS);
+
+    String boundary = "----ESP32CAMBoundary";
+    http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+    String bodyStart = "--" + boundary + "\r\n";
+    bodyStart += "Content-Disposition: form-data; name=\"image\"; filename=\"approach.jpg\"\r\n";
+    bodyStart += "Content-Type: image/jpeg\r\n\r\n";
+
+    String apiKeyPart = "";
+    if (strlen(API_KEY) > 0) {
+        apiKeyPart = "\r\n--" + boundary + "\r\n";
+        apiKeyPart += "Content-Disposition: form-data; name=\"apiKey\"\r\n\r\n";
+        apiKeyPart += String(API_KEY);
+    }
+
+    String sidePart = "";
+    if (side && strlen(side) > 0) {
+        sidePart = "\r\n--" + boundary + "\r\n";
+        sidePart += "Content-Disposition: form-data; name=\"side\"\r\n\r\n";
+        sidePart += String(side);
+    }
+
+    String bodyEnd = "\r\n--" + boundary + "--\r\n";
+    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + sidePart.length() + bodyEnd.length();
+
+    uint8_t* body = (uint8_t*)malloc(totalLen);
+    if (!body) {
+        http.end();
+        return false;
+    }
+
+    int offset = 0;
+    memcpy(body + offset, bodyStart.c_str(), bodyStart.length()); offset += bodyStart.length();
+    memcpy(body + offset, fb->buf, fb->len); offset += fb->len;
+    if (apiKeyPart.length() > 0) { memcpy(body + offset, apiKeyPart.c_str(), apiKeyPart.length()); offset += apiKeyPart.length(); }
+    if (sidePart.length() > 0) { memcpy(body + offset, sidePart.c_str(), sidePart.length()); offset += sidePart.length(); }
+    memcpy(body + offset, bodyEnd.c_str(), bodyEnd.length());
+
+    int httpCode = http.POST(body, totalLen);
+    free(body);
+    http.end();
+
+    Serial.printf("Approach photo upload: HTTP %d\n", httpCode);
+    return (httpCode == HTTP_CODE_NO_CONTENT || httpCode == HTTP_CODE_OK);
+}
+
 void api_post_firmware_event(const char* apiKey, const char* eventType, const char* notes, double batteryVoltage) {
     JsonDocument doc;
     doc["apiKey"] = apiKey;

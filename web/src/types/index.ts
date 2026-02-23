@@ -38,6 +38,7 @@ export interface DoorEvent {
   timestamp: string;
   side: string | null;
   direction: string | null;
+  imageUrl: string | null;
 }
 
 export interface DoorConfiguration {

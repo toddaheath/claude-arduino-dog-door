@@ -75,6 +75,8 @@ The ESP32-CAM is the clear winner: it integrates camera and WiFi, has enough mem
 
 Note: ESP32-CAM has limited exposed GPIO pins. GPIO0 and GPIO4 have special boot functions — GPIO4 also drives the onboard flash LED. Pin assignments may need adjustment based on the specific ESP32-CAM board revision.
 
+> **Full wiring diagrams** with per-component connection details, resistor values, level-shifting, power distribution, and dual-camera setup: see [wiring-diagrams.md](wiring-diagrams.md).
+
 ## Power Budget
 
 | Component | Voltage | Max Current |
