@@ -3,11 +3,13 @@ using System.Net.Http.Json;
 using DogDoor.Api.Data;
 using DogDoor.Api.DTOs;
 using DogDoor.Api.Models;
+using DogDoor.Api.Services;
 using DogDoor.Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 
 namespace DogDoor.Api.Tests.Integration;
 
@@ -31,6 +33,10 @@ public class CustomWebAppFactory : WebApplicationFactory<Program>
             // Use in-memory database for tests
             services.AddDbContext<DogDoorDbContext>(options =>
                 options.UseInMemoryDatabase(_dbName));
+
+            // Mock external services to prevent real network calls
+            services.AddSingleton<ISmsService>(Mock.Of<ISmsService>());
+            services.AddSingleton<INotificationService>(Mock.Of<INotificationService>());
 
             // Replace JWT authentication with test auth handler
             services.AddAuthentication(TestAuthHandler.SchemeName)
@@ -172,5 +178,47 @@ public class ApiIntegrationTests : IClassFixture<CustomWebAppFactory>
     {
         var response = await _client.GetAsync("/api/v1/accesslogs");
         response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task GetNotificationPreferences_ReturnsDefaults()
+    {
+        var response = await _client.GetAsync("/api/v1/users/me/notifications");
+        response.EnsureSuccessStatusCode();
+
+        var prefs = await response.Content.ReadFromJsonAsync<NotificationPreferencesDto>();
+        Assert.NotNull(prefs);
+        Assert.False(prefs.EmailEnabled);
+        Assert.False(prefs.SmsEnabled);
+        Assert.False(prefs.AnimalApproachInside);
+    }
+
+    [Fact]
+    public async Task UpdateNotificationPreferences_SavesChanges()
+    {
+        var update = new UpdateNotificationPreferencesDto(
+            EmailEnabled: true,
+            SmsEnabled: false,
+            AnimalApproachInside: true,
+            AnimalApproachOutside: false,
+            UnknownAnimalInside: null,
+            UnknownAnimalOutside: null,
+            DoorOpened: null,
+            DoorClosed: null,
+            DoorFailedOpen: null,
+            DoorFailedClose: null,
+            PowerDisconnected: null,
+            PowerRestored: null,
+            BatteryLow: null,
+            BatteryCharged: null);
+
+        var putResponse = await _client.PutAsJsonAsync("/api/v1/users/me/notifications", update);
+        putResponse.EnsureSuccessStatusCode();
+
+        var saved = await putResponse.Content.ReadFromJsonAsync<NotificationPreferencesDto>();
+        Assert.NotNull(saved);
+        Assert.True(saved.EmailEnabled);
+        Assert.True(saved.AnimalApproachInside);
+        Assert.False(saved.AnimalApproachOutside);
     }
 }

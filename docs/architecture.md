@@ -53,17 +53,24 @@ sequenceDiagram
     participant ESP as ESP32-CAM
     participant API as .NET API
     participant DB as PostgreSQL
+    participant FS as File Storage
     participant SPA as React SPA
 
     S->>ESP: Motion + proximity detected
     ESP->>ESP: Capture camera image
+
+    ESP->>API: POST /api/v1/doors/approach-photo (image, side, apiKey)
+    API->>FS: Save image to uploads/approach/
+    API->>DB: Log AnimalApproach event (with image path + side)
+
     ESP->>ESP: TFLite: dog vs not-dog
 
     alt Dog Detected
-        ESP->>API: POST /api/doors/access-request (image, side)
+        ESP->>API: POST /api/v1/doors/access-request (image, side, apiKey)
+        API->>FS: Save image to uploads/events/
         API->>API: Determine direction from side (inside→exiting, outside→entering)
-        API->>API: pHash compare with stored photos
-        API->>DB: Log door event (with side + direction)
+        API->>API: pHash compare with stored animal photos
+        API->>DB: Log access event (Granted/Denied/Unknown, with image path)
 
         alt Known Dog (Allowed)
             API-->>ESP: 200 OK {allow: true, animalId: 1, direction: "entering"}
@@ -75,12 +82,14 @@ sequenceDiagram
             ESP->>ESP: Flash deny LED
         end
     else Not a Dog
-        ESP->>ESP: Ignore, return to sensing
+        ESP->>ESP: Return to sensing (approach photo already logged)
     end
 
-    SPA->>API: GET /api/access-logs
-    API->>DB: Query events
-    API-->>SPA: Return event list
+    SPA->>API: GET /api/v1/accesslogs
+    API->>DB: Query events (includes imageUrl)
+    API-->>SPA: Return event list with imageUrl for each entry
+    SPA->>API: GET /uploads/approach/{guid}.jpg
+    API-->>SPA: Serve JPEG from filesystem
 ```
 
 ## Component Details
@@ -121,11 +130,15 @@ sequenceDiagram
 | GET | /api/animals/{id}/photos | List animal photos |
 | POST | /api/photos/upload/{animalId} | Upload photo |
 | DELETE | /api/photos/{id} | Delete photo |
-| POST | /api/doors/access-request | Request door access (image + optional side + apiKey) |
-| GET | /api/doors/status | Get door status |
-| PUT | /api/doors/configuration | Update door config |
-| GET | /api/access-logs | Query access logs |
-| GET | /api/access-logs/{id} | Get specific log entry |
+| POST | /api/v1/doors/approach-photo | Upload approach image for any motion detection (no-auth, apiKey in form) |
+| POST | /api/v1/doors/access-request | Request door access — image + optional side + apiKey |
+| POST | /api/v1/doors/firmware-event | Post firmware event (door opened/closed, power events) |
+| GET | /api/v1/doors/status | Get door status |
+| PUT | /api/v1/doors/configuration | Update door config |
+| GET | /api/v1/accesslogs | Query access logs (includes imageUrl per entry) |
+| GET | /api/v1/accesslogs/{id} | Get specific log entry |
+| GET | /uploads/approach/{file} | Serve approach photo (static file) |
+| GET | /uploads/events/{file} | Serve access-request photo (static file) |
 
 ## Security Considerations
 
