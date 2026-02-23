@@ -4,6 +4,8 @@ import { useApi } from '../hooks/useApi';
 import { SkeletonRow } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 const eventTypeColors: Record<string, string> = {
   AccessGranted: '#2e7d32',
   AccessDenied: '#c62828',
@@ -15,6 +17,7 @@ const eventTypeColors: Record<string, string> = {
   ExitDenied: '#c62828',
   EntryGranted: '#2e7d32',
   EntryDenied: '#c62828',
+  AnimalApproach: '#e65100',
 };
 
 const directionBadge = (direction: string | null) => {
@@ -63,6 +66,7 @@ export default function AccessLog() {
           style={{ width: 'auto' }}
         >
           <option value="">All Events</option>
+          <option value="AnimalApproach">Animal Approach</option>
           <option value="AccessGranted">Access Granted</option>
           <option value="AccessDenied">Access Denied</option>
           <option value="ExitGranted">Exit Granted</option>
@@ -92,6 +96,7 @@ export default function AccessLog() {
       <table className="table">
         <thead>
           <tr>
+            <th>Photo</th>
             <th>Time</th>
             <th>Event</th>
             <th>Direction</th>
@@ -105,13 +110,34 @@ export default function AccessLog() {
             [...Array(10)].map((_, i) => <SkeletonRow key={i} />)
           ) : logs && logs.length === 0 ? (
             <tr>
-              <td colSpan={6}>
+              <td colSpan={7}>
                 <EmptyState icon="📋" title="No events yet" message="Door events will appear here once your system is active." />
               </td>
             </tr>
           ) : (
             logs?.map(log => (
               <tr key={log.id}>
+                <td style={{ width: 64, textAlign: 'center' }}>
+                  {log.imageUrl ? (
+                    <a href={`${API_BASE}${log.imageUrl}`} target="_blank" rel="noreferrer">
+                      <img
+                        src={`${API_BASE}${log.imageUrl}`}
+                        alt="approach photo"
+                        style={{
+                          width: 56,
+                          height: 42,
+                          objectFit: 'cover',
+                          borderRadius: 4,
+                          border: '1px solid var(--color-border)',
+                          display: 'block',
+                          cursor: 'pointer',
+                        }}
+                      />
+                    </a>
+                  ) : (
+                    <span style={{ color: 'var(--color-muted)', fontSize: 12 }}>—</span>
+                  )}
+                </td>
                 <td style={{ fontSize: 13 }}>
                   {new Date(log.timestamp).toLocaleString()}
                 </td>
