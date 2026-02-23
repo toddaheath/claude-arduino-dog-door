@@ -72,3 +72,6 @@ secret:
   postgresDb: dogdoor
   jwtSecretKey: "change-me-to-a-long-random-secret-key-at-least-32-chars"
   sendgridApiKey: ""
+  twilioAccountSid: ""
+  twilioAuthToken: ""
+  twilioFromPhone: ""

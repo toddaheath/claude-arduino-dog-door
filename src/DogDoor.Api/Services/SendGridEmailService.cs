@@ -43,6 +43,11 @@ public class SendGridEmailService : IEmailService
         await SendEmailAsync(toEmail, subject, body);
     }
 
+    public async Task SendNotificationAsync(string toEmail, string subject, string body)
+    {
+        await SendEmailAsync(toEmail, subject, body);
+    }
+
     private static string MaskEmail(string email)
     {
         if (string.IsNullOrEmpty(email))

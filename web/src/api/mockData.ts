@@ -21,16 +21,16 @@ const now = new Date();
 const hoursAgo = (h: number) => new Date(now.getTime() - h * 3600000).toISOString();
 
 export const mockDoorEvents: DoorEvent[] = [
-  { id: 1, animalId: 1, animalName: 'Buddy', eventType: 'ExitGranted', confidenceScore: 0.92, notes: null, timestamp: hoursAgo(1), side: 'Inside', direction: 'Exiting' },
-  { id: 2, animalId: 2, animalName: 'Luna', eventType: 'EntryGranted', confidenceScore: 0.88, notes: null, timestamp: hoursAgo(2), side: 'Outside', direction: 'Entering' },
-  { id: 3, animalId: null, animalName: null, eventType: 'UnknownAnimal', confidenceScore: 0.25, notes: 'Animal not recognized', timestamp: hoursAgo(3), side: 'Outside', direction: 'Entering' },
-  { id: 4, animalId: 1, animalName: 'Buddy', eventType: 'EntryGranted', confidenceScore: 0.95, notes: null, timestamp: hoursAgo(4), side: 'Outside', direction: 'Entering' },
-  { id: 5, animalId: 3, animalName: 'Stray Cat', eventType: 'EntryDenied', confidenceScore: 0.82, notes: 'Animal not allowed', timestamp: hoursAgo(5), side: 'Outside', direction: 'Entering' },
-  { id: 6, animalId: 2, animalName: 'Luna', eventType: 'ExitGranted', confidenceScore: 0.91, notes: null, timestamp: hoursAgo(6), side: 'Inside', direction: 'Exiting' },
-  { id: 7, animalId: 1, animalName: 'Buddy', eventType: 'AccessGranted', confidenceScore: 0.89, notes: null, timestamp: hoursAgo(12), side: null, direction: null },
-  { id: 8, animalId: null, animalName: null, eventType: 'ManualOverride', confidenceScore: null, notes: 'Manual door open', timestamp: hoursAgo(18), side: null, direction: null },
-  { id: 9, animalId: 2, animalName: 'Luna', eventType: 'ExitGranted', confidenceScore: 0.87, notes: null, timestamp: hoursAgo(20), side: 'Inside', direction: 'Exiting' },
-  { id: 10, animalId: 1, animalName: 'Buddy', eventType: 'EntryGranted', confidenceScore: 0.93, notes: null, timestamp: hoursAgo(22), side: 'Outside', direction: 'Entering' },
+  { id: 1, animalId: 1, animalName: 'Buddy', eventType: 'ExitGranted', confidenceScore: 0.92, notes: null, timestamp: hoursAgo(1), side: 'Inside', direction: 'Exiting', imageUrl: null },
+  { id: 2, animalId: 2, animalName: 'Luna', eventType: 'EntryGranted', confidenceScore: 0.88, notes: null, timestamp: hoursAgo(2), side: 'Outside', direction: 'Entering', imageUrl: null },
+  { id: 3, animalId: null, animalName: null, eventType: 'UnknownAnimal', confidenceScore: 0.25, notes: 'Animal not recognized', timestamp: hoursAgo(3), side: 'Outside', direction: 'Entering', imageUrl: null },
+  { id: 4, animalId: 1, animalName: 'Buddy', eventType: 'EntryGranted', confidenceScore: 0.95, notes: null, timestamp: hoursAgo(4), side: 'Outside', direction: 'Entering', imageUrl: null },
+  { id: 5, animalId: 3, animalName: 'Stray Cat', eventType: 'EntryDenied', confidenceScore: 0.82, notes: 'Animal not allowed', timestamp: hoursAgo(5), side: 'Outside', direction: 'Entering', imageUrl: null },
+  { id: 6, animalId: 2, animalName: 'Luna', eventType: 'ExitGranted', confidenceScore: 0.91, notes: null, timestamp: hoursAgo(6), side: 'Inside', direction: 'Exiting', imageUrl: null },
+  { id: 7, animalId: 1, animalName: 'Buddy', eventType: 'AccessGranted', confidenceScore: 0.89, notes: null, timestamp: hoursAgo(12), side: null, direction: null, imageUrl: null },
+  { id: 8, animalId: null, animalName: null, eventType: 'ManualOverride', confidenceScore: null, notes: 'Manual door open', timestamp: hoursAgo(18), side: null, direction: null, imageUrl: null },
+  { id: 9, animalId: 2, animalName: 'Luna', eventType: 'ExitGranted', confidenceScore: 0.87, notes: null, timestamp: hoursAgo(20), side: 'Inside', direction: 'Exiting', imageUrl: null },
+  { id: 10, animalId: 1, animalName: 'Buddy', eventType: 'EntryGranted', confidenceScore: 0.93, notes: null, timestamp: hoursAgo(22), side: 'Outside', direction: 'Entering', imageUrl: null },
 ];
 
 export const mockConfig: DoorConfiguration = {
