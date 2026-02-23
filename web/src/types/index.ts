@@ -38,6 +38,7 @@ export interface DoorEvent {
   timestamp: string;
   side: string | null;
   direction: string | null;
+  imageUrl: string | null;
 }
 
 export interface DoorConfiguration {
@@ -117,3 +118,22 @@ export interface Invitation {
   expiresAt: string;
   isAccepted: boolean;
 }
+
+export interface NotificationPreferences {
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  animalApproachInside: boolean;
+  animalApproachOutside: boolean;
+  unknownAnimalInside: boolean;
+  unknownAnimalOutside: boolean;
+  doorOpened: boolean;
+  doorClosed: boolean;
+  doorFailedOpen: boolean;
+  doorFailedClose: boolean;
+  powerDisconnected: boolean;
+  powerRestored: boolean;
+  batteryLow: boolean;
+  batteryCharged: boolean;
+}
+
+export type UpdateNotificationPreferences = Partial<NotificationPreferences>;
