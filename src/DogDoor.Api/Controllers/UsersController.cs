@@ -14,10 +14,12 @@ namespace DogDoor.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly INotificationPreferencesService _notifPrefsService;
 
-    public UsersController(IUserService userService)
+    public UsersController(IUserService userService, INotificationPreferencesService notifPrefsService)
     {
         _userService = userService;
+        _notifPrefsService = notifPrefsService;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -84,5 +86,20 @@ public class UsersController : ControllerBase
         {
             return BadRequest(ex.Message);
         }
+    }
+
+    [HttpGet("me/notifications")]
+    public async Task<ActionResult<NotificationPreferencesDto>> GetNotificationPreferences()
+    {
+        var prefs = await _notifPrefsService.GetAsync(CurrentUserId);
+        return Ok(prefs);
+    }
+
+    [HttpPut("me/notifications")]
+    public async Task<ActionResult<NotificationPreferencesDto>> UpdateNotificationPreferences(
+        [FromBody] UpdateNotificationPreferencesDto dto)
+    {
+        var prefs = await _notifPrefsService.UpdateAsync(CurrentUserId, dto);
+        return Ok(prefs);
     }
 }

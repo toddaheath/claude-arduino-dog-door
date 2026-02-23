@@ -1,0 +1,33 @@
+namespace DogDoor.Api.DTOs;
+
+public record NotificationPreferencesDto(
+    bool EmailEnabled,
+    bool SmsEnabled,
+    bool AnimalApproachInside,
+    bool AnimalApproachOutside,
+    bool UnknownAnimalInside,
+    bool UnknownAnimalOutside,
+    bool DoorOpened,
+    bool DoorClosed,
+    bool DoorFailedOpen,
+    bool DoorFailedClose,
+    bool PowerDisconnected,
+    bool PowerRestored,
+    bool BatteryLow,
+    bool BatteryCharged);
+
+public record UpdateNotificationPreferencesDto(
+    bool? EmailEnabled,
+    bool? SmsEnabled,
+    bool? AnimalApproachInside,
+    bool? AnimalApproachOutside,
+    bool? UnknownAnimalInside,
+    bool? UnknownAnimalOutside,
+    bool? DoorOpened,
+    bool? DoorClosed,
+    bool? DoorFailedOpen,
+    bool? DoorFailedClose,
+    bool? PowerDisconnected,
+    bool? PowerRestored,
+    bool? BatteryLow,
+    bool? BatteryCharged);

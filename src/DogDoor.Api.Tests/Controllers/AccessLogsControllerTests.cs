@@ -41,8 +41,8 @@ public class AccessLogsControllerTests
     {
         var logs = new List<DoorEventDto>
         {
-            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null),
-            new(2, null, null, DoorEventType.UnknownAnimal, 0.3, "Not recognized", DateTime.UtcNow, null, null)
+            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null, null),
+            new(2, null, null, DoorEventType.UnknownAnimal, 0.3, "Not recognized", DateTime.UtcNow, null, null, null)
         };
         _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null, null, UserId)).ReturnsAsync(logs);
 
@@ -58,7 +58,7 @@ public class AccessLogsControllerTests
     {
         var logs = new List<DoorEventDto>
         {
-            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null)
+            new(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null, null)
         };
         _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, "AccessGranted", null, UserId)).ReturnsAsync(logs);
 
@@ -74,7 +74,7 @@ public class AccessLogsControllerTests
     {
         var logs = new List<DoorEventDto>
         {
-            new(1, 1, "Buddy", DoorEventType.EntryGranted, 0.9, null, DateTime.UtcNow, "Outside", "Entering")
+            new(1, 1, "Buddy", DoorEventType.EntryGranted, 0.9, null, DateTime.UtcNow, "Outside", "Entering", null)
         };
         _mockService.Setup(s => s.GetAccessLogsAsync(1, 20, null, "Entering", UserId)).ReturnsAsync(logs);
 
@@ -88,7 +88,7 @@ public class AccessLogsControllerTests
     [Fact]
     public async Task GetById_ExistingId_ReturnsOk()
     {
-        var log = new DoorEventDto(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null);
+        var log = new DoorEventDto(1, 1, "Buddy", DoorEventType.AccessGranted, 0.9, null, DateTime.UtcNow, null, null, null);
         _mockService.Setup(s => s.GetAccessLogAsync(1, UserId)).ReturnsAsync(log);
 
         var result = await _controller.GetById(1);
