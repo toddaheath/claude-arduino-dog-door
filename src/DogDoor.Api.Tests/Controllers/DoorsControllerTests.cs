@@ -107,4 +107,26 @@ public class DoorsControllerTests
         var returned = Assert.IsType<AccessResponseDto>(okResult.Value);
         Assert.Equal("Exiting", returned.Direction);
     }
+
+    [Fact]
+    public async Task FirmwareEvent_ValidEventType_ReturnsNoContent()
+    {
+        var dto = new FirmwareEventDto("test-api-key", "DoorOpened", null, null);
+        _mockService.Setup(s => s.RecordFirmwareEventAsync("test-api-key", DogDoor.Api.Models.DoorEventType.DoorOpened, null, null))
+            .Returns(Task.CompletedTask);
+
+        var result = await _controller.FirmwareEvent(dto);
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task FirmwareEvent_InvalidEventType_ReturnsBadRequest()
+    {
+        var dto = new FirmwareEventDto(null, "NotARealEvent", null, null);
+
+        var result = await _controller.FirmwareEvent(dto);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }

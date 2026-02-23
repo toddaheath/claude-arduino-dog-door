@@ -13,7 +13,13 @@ public enum DoorEventType
     ExitGranted,
     ExitDenied,
     EntryGranted,
-    EntryDenied
+    EntryDenied,
+    AnimalApproach = 10,
+    DoorObstructed = 11,
+    PowerLost = 12,
+    PowerRestored = 13,
+    BatteryLow = 14,
+    BatteryCharged = 15
 }
 
 public enum DoorSide
