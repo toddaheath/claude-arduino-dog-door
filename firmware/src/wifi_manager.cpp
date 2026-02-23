@@ -1,14 +1,39 @@
 #include "wifi_manager.h"
 #include "config.h"
 #include <WiFi.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
 
 static unsigned long last_reconnect_attempt = 0;
 
 bool wifi_connect() {
-    Serial.printf("Connecting to WiFi: %s\n", WIFI_SSID);
+    const char* ssid = WIFI_SSID;
+    const char* password = WIFI_PASSWORD;
+
+    // Check for BLE-provisioned credentials stored in LittleFS
+    if (LittleFS.exists("/wifi_creds.json")) {
+        File f = LittleFS.open("/wifi_creds.json", "r");
+        if (f) {
+            JsonDocument doc;
+            if (deserializeJson(doc, f) == DeserializationError::Ok) {
+                const char* stored_ssid = doc["ssid"] | "";
+                const char* stored_pass = doc["password"] | "";
+                if (strlen(stored_ssid) > 0) {
+                    ssid = stored_ssid;
+                    password = stored_pass;
+                    Serial.printf("Connecting to WiFi (from LittleFS): %s\n", ssid);
+                }
+            }
+            f.close();
+        }
+    }
+
+    if (ssid == WIFI_SSID) {
+        Serial.printf("Connecting to WiFi: %s\n", ssid);
+    }
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(ssid, password);
 
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED) {

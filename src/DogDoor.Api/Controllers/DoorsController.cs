@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Asp.Versioning;
 using DogDoor.Api.DTOs;
+using DogDoor.Api.Models;
 using DogDoor.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,5 +52,31 @@ public class DoorsController : ControllerBase
     {
         var config = await _doorService.UpdateConfigurationAsync(dto, CurrentUserId);
         return Ok(config);
+    }
+
+    // No auth — ESP32 identifies via API key in form body
+    [HttpPost("approach-photo")]
+    public async Task<IActionResult> ApproachPhoto(
+        IFormFile image,
+        [FromForm] string? apiKey,
+        [FromForm] string? side)
+    {
+        if (image.Length == 0)
+            return BadRequest("Image is required");
+
+        using var stream = image.OpenReadStream();
+        await _doorService.RecordApproachPhotoAsync(stream, apiKey, side);
+        return NoContent();
+    }
+
+    // No auth — ESP32 identifies via API key
+    [HttpPost("firmware-event")]
+    public async Task<IActionResult> FirmwareEvent([FromBody] FirmwareEventDto dto)
+    {
+        if (!Enum.TryParse<DoorEventType>(dto.EventType, true, out var eventType))
+            return BadRequest($"Unknown event type: {dto.EventType}");
+
+        await _doorService.RecordFirmwareEventAsync(dto.ApiKey, eventType, dto.Notes, dto.BatteryVoltage);
+        return NoContent();
     }
 }
