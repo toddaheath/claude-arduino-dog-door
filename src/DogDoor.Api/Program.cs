@@ -3,10 +3,18 @@ using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Serilog — compact JSON logging driven from appsettings.json
+builder.Host.UseSerilog((ctx, lc) => lc
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext());
 
 // Database
 builder.Services.AddDbContext<DogDoorDbContext>(options =>
@@ -53,6 +61,9 @@ builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<IPhotoService, PhotoService>();
 builder.Services.AddScoped<IAnimalRecognitionService, AnimalRecognitionService>();
 builder.Services.AddScoped<IDoorService, DoorService>();
+builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationPreferencesService, NotificationPreferencesService>();
 
 // API Versioning
 builder.Services.AddApiVersioning(options =>
@@ -106,10 +117,19 @@ app.UseAuthorization();
 app.MapHealthChecks("/healthz").AllowAnonymous();
 app.MapControllers();
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists and serve as static files at /uploads/
 var uploadsPath = Path.Combine(app.Environment.ContentRootPath,
     builder.Configuration.GetValue<string>("PhotoStorage:BasePath") ?? "uploads");
 Directory.CreateDirectory(uploadsPath);
+Directory.CreateDirectory(Path.Combine(uploadsPath, "events"));
+Directory.CreateDirectory(Path.Combine(uploadsPath, "approach"));
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads",
+    ContentTypeProvider = new FileExtensionContentTypeProvider()
+});
 
 // Run migrations (or EnsureCreated for non-relational, e.g., in-memory test DB)
 using (var scope = app.Services.CreateScope())
@@ -153,6 +173,21 @@ using (var scope = app.Services.CreateScope())
               AND EXISTS (
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name = 'Users'
+              );
+            """);
+
+        // If NotificationPreferences already exists (EnsureCreated after this model was added),
+        // mark AddNotificationPreferences as applied so MigrateAsync skips it.
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+            SELECT '20260220140432_AddNotificationPreferences', '9.0.13'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "__EFMigrationsHistory"
+                WHERE "MigrationId" = '20260220140432_AddNotificationPreferences'
+              )
+              AND EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'NotificationPreferences'
               );
             """);
 

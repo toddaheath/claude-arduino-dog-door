@@ -56,4 +56,5 @@ public class User
     public ICollection<Invitation> SentInvitations { get; set; } = new List<Invitation>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
+    public NotificationPreferences? NotificationPreferences { get; set; }
 }

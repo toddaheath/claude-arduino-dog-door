@@ -16,6 +16,7 @@ public class DogDoorDbContext : DbContext
     public DbSet<AnimalPhoto> AnimalPhotos => Set<AnimalPhoto>();
     public DbSet<DoorEvent> DoorEvents => Set<DoorEvent>();
     public DbSet<DoorConfiguration> DoorConfigurations => Set<DoorConfiguration>();
+    public DbSet<NotificationPreferences> NotificationPreferences => Set<NotificationPreferences>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -114,6 +115,16 @@ public class DogDoorDbContext : DbContext
             entity.HasOne(e => e.User)
                 .WithMany(u => u.DoorConfigurations)
                 .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotificationPreferences>(entity =>
+        {
+            entity.HasIndex(e => e.UserId).IsUnique();
+
+            entity.HasOne(e => e.User)
+                .WithOne(u => u.NotificationPreferences)
+                .HasForeignKey<NotificationPreferences>(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
