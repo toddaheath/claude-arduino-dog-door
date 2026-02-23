@@ -140,7 +140,7 @@ void loop() {
     Serial.printf("Animal detected at %.1f cm\n", distance);
     led_processing();
 
-    // Stage 3: Capture camera image
+    // Stage 3: Capture camera image and upload approach photo for all detections
     camera_fb_t* fb = camera_capture();
     if (!fb) {
         Serial.println("Camera capture failed");
@@ -149,6 +149,10 @@ void loop() {
         led_off();
         return;
     }
+
+    // Upload approach photo regardless of TFLite outcome so every detection
+    // is visible in the admin portal log with its captured image.
+    api_post_approach_photo(fb, THIS_SIDE);
 
     // Stage 4: On-device dog detection
     float dog_score = detection_run(fb);

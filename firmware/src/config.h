@@ -21,6 +21,7 @@
 // ===== API Configuration =====
 #define API_BASE_URL "http://192.168.1.100:5001"
 #define API_ACCESS_ENDPOINT "/api/v1/doors/access-request"
+#define API_APPROACH_ENDPOINT "/api/v1/doors/approach-photo"
 #define API_KEY ""  // Set if door configuration has API key
 #define API_TIMEOUT_MS 10000
 

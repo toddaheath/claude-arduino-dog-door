@@ -3,7 +3,9 @@ using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -109,10 +111,19 @@ app.UseAuthorization();
 app.MapHealthChecks("/healthz").AllowAnonymous();
 app.MapControllers();
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists and serve as static files at /uploads/
 var uploadsPath = Path.Combine(app.Environment.ContentRootPath,
     builder.Configuration.GetValue<string>("PhotoStorage:BasePath") ?? "uploads");
 Directory.CreateDirectory(uploadsPath);
+Directory.CreateDirectory(Path.Combine(uploadsPath, "events"));
+Directory.CreateDirectory(Path.Combine(uploadsPath, "approach"));
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads",
+    ContentTypeProvider = new FileExtensionContentTypeProvider()
+});
 
 // Run migrations (or EnsureCreated for non-relational, e.g., in-memory test DB)
 using (var scope = app.Services.CreateScope())
