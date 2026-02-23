@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
@@ -8,18 +7,14 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// JSON structured logging — compact single-line output with UTC timestamps
-builder.Logging.ClearProviders();
-builder.Logging.AddJsonConsole(options =>
-{
-    options.UseUtcTimestamp = true;
-    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ssZ";
-    options.IncludeScopes = false;
-    options.JsonWriterOptions = new JsonWriterOptions { Indented = false };
-});
+// Serilog — compact JSON logging driven from appsettings.json
+builder.Host.UseSerilog((ctx, lc) => lc
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext());
 
 // Database
 builder.Services.AddDbContext<DogDoorDbContext>(options =>
