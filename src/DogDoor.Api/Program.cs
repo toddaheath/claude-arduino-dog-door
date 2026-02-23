@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
@@ -9,6 +10,16 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// JSON structured logging — compact single-line output with UTC timestamps
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole(options =>
+{
+    options.UseUtcTimestamp = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ssZ";
+    options.IncludeScopes = false;
+    options.JsonWriterOptions = new JsonWriterOptions { Indented = false };
+});
 
 // Database
 builder.Services.AddDbContext<DogDoorDbContext>(options =>
