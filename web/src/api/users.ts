@@ -1,4 +1,4 @@
-import type { UserProfile, Guest, Invitation } from '../types';
+import type { UserProfile, Guest, Invitation, NotificationPreferences, UpdateNotificationPreferences } from '../types';
 
 const BASE = `${import.meta.env.VITE_API_URL || ''}/api/v1/users`;
 
@@ -50,4 +50,10 @@ export const usersApi = {
 
   acceptInvitation: (token: string, invitationToken: string) =>
     request<void>('POST', `/me/invitations/accept/${invitationToken}`, token),
+
+  getNotificationPreferences: (token: string) =>
+    request<NotificationPreferences>('GET', '/me/notifications', token),
+
+  updateNotificationPreferences: (token: string, data: UpdateNotificationPreferences) =>
+    request<NotificationPreferences>('PUT', '/me/notifications', token, data),
 };

@@ -45,7 +45,7 @@ public class DoorServiceTests : IDisposable
             .AddInMemoryCollection(configDict)
             .Build();
 
-        _service = new DoorService(_db, _mapper, _mockRecognition.Object, mockEnv.Object, config);
+        _service = new DoorService(_db, _mapper, _mockRecognition.Object, mockEnv.Object, config, Mock.Of<INotificationService>());
     }
 
     public void Dispose()

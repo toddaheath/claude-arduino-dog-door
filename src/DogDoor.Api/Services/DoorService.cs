@@ -13,19 +13,22 @@ public class DoorService : IDoorService
     private readonly IAnimalRecognitionService _recognition;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
+    private readonly INotificationService _notificationService;
 
     public DoorService(
         DogDoorDbContext db,
         IMapper mapper,
         IAnimalRecognitionService recognition,
         IWebHostEnvironment env,
-        IConfiguration config)
+        IConfiguration config,
+        INotificationService notificationService)
     {
         _db = db;
         _mapper = mapper;
         _recognition = recognition;
         _env = env;
         _config = config;
+        _notificationService = notificationService;
     }
 
     public async Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey, string? side = null)
@@ -69,6 +72,7 @@ public class DoorService : IDoorService
         if (!doorConfig.IsEnabled)
         {
             await LogEventAsync(userId, null, DoorEventType.AccessDenied, null, 0, "Door is disabled", doorSide, direction);
+            await _notificationService.NotifyAsync(userId, DoorEventType.AccessDenied, null, doorSide, "Door is disabled");
             return new AccessResponseDto(false, null, null, null, "Door is disabled", directionString);
         }
 
@@ -83,15 +87,18 @@ public class DoorService : IDoorService
             if (isNightTime)
             {
                 await LogEventAsync(userId, null, DoorEventType.AccessDenied, null, 0, "Night mode active", doorSide, direction);
+                await _notificationService.NotifyAsync(userId, DoorEventType.AccessDenied, null, doorSide, "Night mode active");
                 return new AccessResponseDto(false, null, null, null, "Night mode active", directionString);
             }
         }
 
-        // Save incoming image
+        // Save incoming image (relative path stored in DB; served via /uploads/ static files)
         var basePath = _config.GetValue<string>("PhotoStorage:BasePath") ?? "uploads";
         var eventImagesDir = Path.Combine(_env.ContentRootPath, basePath, "events");
         Directory.CreateDirectory(eventImagesDir);
-        var imagePath = Path.Combine(eventImagesDir, $"{Guid.NewGuid()}.jpg");
+        var fileName = $"{Guid.NewGuid()}.jpg";
+        var imagePath = Path.Combine(eventImagesDir, fileName);
+        var imageRelativePath = $"events/{fileName}";
 
         using (var fs = new FileStream(imagePath, FileMode.Create))
         {
@@ -115,7 +122,8 @@ public class DoorService : IDoorService
                     TransitDirection.Entering => DoorEventType.EntryGranted,
                     _ => DoorEventType.AccessGranted
                 };
-                await LogEventAsync(userId, animal.Id, grantedType, imagePath, result.Confidence, null, doorSide, direction);
+                await LogEventAsync(userId, animal.Id, grantedType, imageRelativePath, result.Confidence, null, doorSide, direction);
+                await _notificationService.NotifyAsync(userId, grantedType, animal.Name, doorSide, null);
                 return new AccessResponseDto(true, animal.Id, animal.Name, result.Confidence, null, directionString);
             }
 
@@ -125,11 +133,13 @@ public class DoorService : IDoorService
                 TransitDirection.Entering => DoorEventType.EntryDenied,
                 _ => DoorEventType.AccessDenied
             };
-            await LogEventAsync(userId, result.AnimalId, deniedType, imagePath, result.Confidence, "Animal not allowed", doorSide, direction);
+            await LogEventAsync(userId, result.AnimalId, deniedType, imageRelativePath, result.Confidence, "Animal not allowed", doorSide, direction);
+            await _notificationService.NotifyAsync(userId, deniedType, result.AnimalName, doorSide, "Animal not allowed");
             return new AccessResponseDto(false, result.AnimalId, result.AnimalName, result.Confidence, "Animal not allowed", directionString);
         }
 
-        await LogEventAsync(userId, null, DoorEventType.UnknownAnimal, imagePath, result.Confidence, "Animal not recognized", doorSide, direction);
+        await LogEventAsync(userId, null, DoorEventType.UnknownAnimal, imageRelativePath, result.Confidence, "Animal not recognized", doorSide, direction);
+        await _notificationService.NotifyAsync(userId, DoorEventType.UnknownAnimal, null, doorSide, "Animal not recognized");
         return new AccessResponseDto(false, null, null, result.Confidence, "Animal not recognized", directionString);
     }
 
@@ -202,6 +212,50 @@ public class DoorService : IDoorService
             .FirstOrDefaultAsync(e => e.Id == id && e.UserId == userId);
 
         return doorEvent is null ? null : _mapper.Map<DoorEventDto>(doorEvent);
+    }
+
+    public async Task RecordApproachPhotoAsync(Stream imageStream, string? apiKey, string? side)
+    {
+        DoorConfiguration? doorConfig = apiKey != null
+            ? await _db.DoorConfigurations.FirstOrDefaultAsync(c => c.ApiKey == apiKey)
+            : await _db.DoorConfigurations.FirstOrDefaultAsync(c => c.ApiKey == null);
+
+        if (doorConfig is null) return;
+
+        DoorSide? doorSide = side?.ToLowerInvariant() switch
+        {
+            "inside" => DoorSide.Inside,
+            "outside" => DoorSide.Outside,
+            _ => null
+        };
+
+        var basePath = _config.GetValue<string>("PhotoStorage:BasePath") ?? "uploads";
+        var approachDir = Path.Combine(_env.ContentRootPath, basePath, "approach");
+        Directory.CreateDirectory(approachDir);
+        var fileName = $"{Guid.NewGuid()}.jpg";
+        var fullPath = Path.Combine(approachDir, fileName);
+        var relativePath = $"approach/{fileName}";
+
+        using (var fs = new FileStream(fullPath, FileMode.Create))
+        {
+            await imageStream.CopyToAsync(fs);
+        }
+
+        await LogEventAsync(doorConfig.UserId, null, DoorEventType.AnimalApproach, relativePath, null, null, doorSide, null);
+        await _notificationService.NotifyAsync(doorConfig.UserId, DoorEventType.AnimalApproach, null, doorSide, null);
+    }
+
+    public async Task RecordFirmwareEventAsync(string? apiKey, DoorEventType eventType, string? notes, double? batteryVoltage)
+    {
+        DoorConfiguration? doorConfig = apiKey != null
+            ? await _db.DoorConfigurations.FirstOrDefaultAsync(c => c.ApiKey == apiKey)
+            : await _db.DoorConfigurations.FirstOrDefaultAsync(c => c.ApiKey == null);
+
+        if (doorConfig is null) return;
+
+        int userId = doorConfig.UserId;
+        await LogEventAsync(userId, null, eventType, null, batteryVoltage, notes, null, null);
+        await _notificationService.NotifyAsync(userId, eventType, null, null, notes);
     }
 
     private async Task LogEventAsync(int userId, int? animalId, DoorEventType eventType, string? imagePath, double? confidence, string? notes, DoorSide? side = null, TransitDirection? direction = null)

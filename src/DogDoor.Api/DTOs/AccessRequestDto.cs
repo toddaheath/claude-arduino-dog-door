@@ -5,6 +5,12 @@ public record AccessRequestDto(
     string? Side
 );
 
+public record FirmwareEventDto(
+    string? ApiKey,
+    string EventType,
+    string? Notes,
+    double? BatteryVoltage);
+
 public record AccessResponseDto(
     bool Allowed,
     int? AnimalId,
