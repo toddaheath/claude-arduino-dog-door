@@ -5,10 +5,10 @@ metadata:
 spec:
   replicas: {{ .Values.api.replicas }}
   strategy:
-    type: {{ .Values.api.strategy | default "RollingUpdate" }}
-    {{- if eq (.Values.api.strategy | default "RollingUpdate") "Recreate" }}
-    rollingUpdate: null
-    {{- end }}
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.api.rollingUpdate.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.api.rollingUpdate.maxUnavailable | default 0 }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api
