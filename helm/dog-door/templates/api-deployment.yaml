@@ -4,6 +4,11 @@ metadata:
   name: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.api.rollingUpdate.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.api.rollingUpdate.maxUnavailable | default 0 }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api
