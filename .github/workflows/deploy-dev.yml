@@ -164,7 +164,7 @@ jobs:
             --values helm/dog-door/values-dev.yaml \
             --set api.image.tag=${{ needs.build-and-push-api.outputs.image_tag }} \
             --wait \
-            --timeout 5m
+            --timeout 8m
 
       - name: Verify deployment
         run: |

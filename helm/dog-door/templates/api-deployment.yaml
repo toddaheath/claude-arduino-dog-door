@@ -4,6 +4,8 @@ metadata:
   name: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  strategy:
+    type: {{ .Values.api.strategy | default "RollingUpdate" }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api

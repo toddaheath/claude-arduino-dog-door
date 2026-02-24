@@ -2,6 +2,7 @@ api:
   image:
     repository: acrheathrobotics.azurecr.io/dogdoor-api
   replicas: 1
+  strategy: Recreate
 
 web:
   enabled: false
