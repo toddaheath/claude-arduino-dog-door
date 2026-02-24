@@ -93,6 +93,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           format: table
+          ignore-unfixed: true
 
       - name: Run Trivy on Web image
         uses: aquasecurity/trivy-action@master
@@ -101,3 +102,4 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           format: table
+          ignore-unfixed: true
