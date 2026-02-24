@@ -6,6 +6,9 @@ spec:
   replicas: {{ .Values.api.replicas }}
   strategy:
     type: {{ .Values.api.strategy | default "RollingUpdate" }}
+    {{- if eq (.Values.api.strategy | default "RollingUpdate") "Recreate" }}
+    rollingUpdate: null
+    {{- end }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api
