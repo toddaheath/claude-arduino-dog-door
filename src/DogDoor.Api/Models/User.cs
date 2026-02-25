@@ -10,8 +10,7 @@ public class User
     [MaxLength(256)]
     public string Email { get; set; } = string.Empty;
 
-    [Required]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string? PasswordHash { get; set; }
 
     [MaxLength(100)]
     public string? FirstName { get; set; }
@@ -57,4 +56,5 @@ public class User
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
     public NotificationPreferences? NotificationPreferences { get; set; }
+    public ICollection<ExternalLogin> ExternalLogins { get; set; } = [];
 }
