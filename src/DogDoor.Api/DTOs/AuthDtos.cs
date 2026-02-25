@@ -1,3 +1,5 @@
+using DogDoor.Api.Models;
+
 namespace DogDoor.Api.DTOs;
 
 public record RegisterDto(
@@ -34,4 +36,16 @@ public record AuthResponseDto(
     string RefreshToken,
     DateTime ExpiresAt,
     UserSummaryDto User
+);
+
+public record ExternalLoginCallbackDto(
+    ExternalLoginProvider Provider,
+    string IdToken,
+    string? AccessToken
+);
+
+public record LinkExternalLoginDto(
+    ExternalLoginProvider Provider,
+    string ProviderUserId,
+    string? ProviderEmail
 );

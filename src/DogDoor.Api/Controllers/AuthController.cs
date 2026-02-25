@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using DogDoor.Api.DTOs;
+using DogDoor.Api.Models;
 using DogDoor.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -84,5 +85,14 @@ public class AuthController : ControllerBase
     {
         await _authService.ForgotUsernameAsync(dto.Email);
         return NoContent();
+    }
+
+    [HttpPost("external/{provider}")]
+    public async Task<ActionResult<AuthResponseDto>> ExternalLogin(
+        ExternalLoginProvider provider,
+        [FromBody] ExternalLoginCallbackDto dto)
+    {
+        _ = await _authService.ExternalLoginAsync(provider, dto.IdToken);
+        return StatusCode(501, $"SSO provider '{provider}' not yet configured");
     }
 }

@@ -60,7 +60,7 @@ public class AuthService : IAuthService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
         if (user == null) return null;
 
-        if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        if (user.PasswordHash == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return null;
 
         return await CreateAuthResponseAsync(user);
@@ -136,6 +136,18 @@ public class AuthService : IAuthService
         if (user == null) return; // Silent
 
         await _emailService.SendUsernameLookupAsync(email, email);
+    }
+
+    public Task<AuthResponseDto?> ExternalLoginAsync(ExternalLoginProvider provider, string idToken)
+    {
+        // Stub: real OAuth token validation per provider not yet implemented
+        return Task.FromResult<AuthResponseDto?>(null);
+    }
+
+    public Task<bool> LinkExternalLoginAsync(int userId, ExternalLoginProvider provider, string providerUserId, string? providerEmail)
+    {
+        // Stub: real account linking not yet implemented
+        return Task.FromResult(false);
     }
 
     private async Task<AuthResponseDto> CreateAuthResponseAsync(User user)
