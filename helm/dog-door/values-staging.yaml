@@ -12,3 +12,6 @@ ingress:
 
 config:
   aspnetcoreEnvironment: Staging
+
+secret:
+  jwtSecretKey: "staging-override-set-real-secret-via-helm-set-in-deploy"
