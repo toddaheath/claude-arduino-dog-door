@@ -22,6 +22,8 @@ public class AuthWebAppFactory : WebApplicationFactory<Program>
     {
         // Provide a deterministic JWT secret so JwtService and the JWT middleware agree.
         builder.UseSetting("JWT:SecretKey", "test-jwt-secret-key-at-least-32-characters!!");
+        // Disable rate limiting in tests
+        builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000");
 
         builder.ConfigureServices(services =>
         {
@@ -40,6 +42,7 @@ public class AuthWebAppFactory : WebApplicationFactory<Program>
             services.AddSingleton<IEmailService>(Mock.Of<IEmailService>());
             services.AddSingleton<ISmsService>(Mock.Of<ISmsService>());
             services.AddSingleton<INotificationService>(Mock.Of<INotificationService>());
+
         });
     }
 }

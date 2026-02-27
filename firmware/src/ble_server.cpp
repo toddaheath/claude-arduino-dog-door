@@ -6,7 +6,7 @@
 #include <BLE2902.h>
 #include <BLESecurity.h>
 #include <ArduinoJson.h>
-#include <LittleFS.h>
+#include "wifi_manager.h"
 
 static BLEServer* _server = nullptr;
 static BLECharacteristic* _statusChar = nullptr;
@@ -89,12 +89,9 @@ class WifiCallbacks : public BLECharacteristicCallbacks {
             strncpy(_pendingPass, pass, 63);
             _hasWifiUpdate = true;
 
-            // Persist to LittleFS
-            File f = LittleFS.open("/wifi_creds.json", "w");
-            if (f) {
-                serializeJson(doc, f);
-                f.close();
-                Serial.println("[BLE] WiFi credentials saved");
+            // Persist to NVS (encrypted storage)
+            if (wifi_save_credentials(ssid, pass)) {
+                Serial.println("[BLE] WiFi credentials saved to NVS");
             }
         }
     }

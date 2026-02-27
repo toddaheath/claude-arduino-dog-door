@@ -12,6 +12,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 jobs:
   check-credentials:
@@ -21,6 +22,19 @@ jobs:
     outputs:
       configured: ${{ steps.check.outputs.configured }}
     steps:
+      - name: Verify CI passed for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if the CI workflow succeeded for this SHA
+          ci_conclusion=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq ".workflow_runs[] | select(.head_sha == \"${{ github.sha }}\" and .name == \"CI\") | .conclusion" \
+            | head -1)
+          if [[ "$ci_conclusion" != "success" ]]; then
+            echo "::error::CI workflow has not passed for commit ${{ github.sha }}. Conclusion: ${ci_conclusion:-not found}"
+            exit 1
+          fi
+
       - name: Check Azure credentials
         id: check
         run: |

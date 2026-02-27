@@ -11,6 +11,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -72,8 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSession();
   }, [refreshToken, clearSession]);
 
+  const refreshSession = useCallback(async () => {
+    if (!refreshToken) {
+      clearSession();
+      return;
+    }
+    try {
+      const response = await authApi.refresh(refreshToken);
+      saveSession(response.accessToken, response.refreshToken, response.user);
+    } catch {
+      clearSession();
+    }
+  }, [refreshToken, saveSession, clearSession]);
+
   return (
-    <AuthContext.Provider value={{ currentUser, accessToken, isLoading: false, login, register, logout }}>
+    <AuthContext.Provider value={{ currentUser, accessToken, isLoading: false, login, register, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

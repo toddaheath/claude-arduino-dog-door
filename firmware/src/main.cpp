@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_task_wdt.h>
+#include <nvs_flash.h>
 #include "config.h"
 #include "sensors.h"
 #include "camera.h"
@@ -20,6 +22,13 @@ void setup() {
     Serial.begin(115200);
     Serial.println("\n=== Smart Dog Door ===");
     Serial.println("Initializing...");
+
+    // Initialize NVS (encrypted flash storage for WiFi credentials)
+    esp_err_t nvs_ret = nvs_flash_init();
+    if (nvs_ret == ESP_ERR_NVS_NO_FREE_PAGES || nvs_ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        nvs_flash_init();
+    }
 
     // Initialize subsystems
     sensors_init();
@@ -62,9 +71,15 @@ void setup() {
 
     led_off();
     Serial.println("=== Ready ===\n");
+
+    // Hardware watchdog: auto-reboot if loop() stalls for >30s
+    esp_task_wdt_init(30, true);  // 30s timeout, panic on timeout
+    esp_task_wdt_add(NULL);       // Add current task (loopTask)
 }
 
 void loop() {
+    esp_task_wdt_reset();
+
     // BLE: handle commands and WiFi provisioning
     ble_server_update();
 
@@ -153,6 +168,20 @@ void loop() {
     // Upload approach photo regardless of TFLite outcome so every detection
     // is visible in the admin portal log with its captured image.
     api_post_approach_photo(fb, THIS_SIDE);
+
+    // Release framebuffer after upload to free ~100KB PSRAM during detection
+    camera_release(fb);
+
+    // Recapture fresh frame for detection and identification
+    fb = camera_capture();
+    if (!fb) {
+        Serial.println("Camera recapture failed");
+        led_deny();
+        delay(1000);
+        led_off();
+        last_detection_time = millis();
+        return;
+    }
 
     // Stage 4: On-device dog detection
     float dog_score = detection_run(fb);

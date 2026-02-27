@@ -13,10 +13,20 @@ spec:
       labels:
         app: {{ .Release.Name }}-web
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
       containers:
         - name: web
           image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
           imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: {{ .Values.web.port }}
           resources:
@@ -27,4 +37,21 @@ spec:
               port: {{ .Values.web.port }}
             initialDelaySeconds: 5
             periodSeconds: 10
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: nginx-cache
+          emptyDir:
+            medium: Memory
+        - name: nginx-run
+          emptyDir:
+            medium: Memory
+        - name: tmp
+          emptyDir:
+            medium: Memory
 {{- end }}

@@ -1,8 +1,10 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -93,6 +95,20 @@ builder.Services.AddApiVersioning(options =>
 // Health checks
 builder.Services.AddHealthChecks();
 
+// Rate limiting for auth endpoints (brute-force protection)
+var rateLimitPermit = builder.Configuration.GetValue("RateLimiting:Auth:PermitLimit", 10);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = rateLimitPermit;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+});
+
 // Controllers
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -124,6 +140,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/healthz").AllowAnonymous();
