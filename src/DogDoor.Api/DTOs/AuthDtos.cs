@@ -38,6 +38,12 @@ public record AuthResponseDto(
     UserSummaryDto User
 );
 
+public record AuthResponseBodyDto(
+    string AccessToken,
+    DateTime ExpiresAt,
+    UserSummaryDto User
+);
+
 public record ExternalLoginCallbackDto(
     ExternalLoginProvider Provider,
     string IdToken,

@@ -2,11 +2,12 @@ import type { AuthResponse } from '../types';
 
 const BASE = `${import.meta.env.VITE_API_URL || ''}/api/v1/auth`;
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
   if (!res.ok) {
     const text = await res.text();
@@ -23,11 +24,11 @@ export const authApi = {
   login: (email: string, password: string) =>
     post<AuthResponse>('/login', { email, password }),
 
-  refresh: (refreshToken: string) =>
-    post<AuthResponse>('/refresh', { refreshToken }),
+  refresh: () =>
+    post<AuthResponse>('/refresh'),
 
-  logout: (refreshToken: string) =>
-    post<void>('/logout', { refreshToken }),
+  logout: () =>
+    post<void>('/logout'),
 
   forgotPassword: (email: string) =>
     post<void>('/forgot-password', { email }),
