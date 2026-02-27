@@ -67,6 +67,10 @@ helm uninstall dog-door                        # Remove
 - ESP32 does on-device dog detection via TFLite Micro
 - API does dog identification via perceptual hashing (pHash)
 - All timestamps in UTC
+- Refresh tokens stored in httpOnly, Secure, SameSite=Strict cookies (`Path=/api/v1/auth`, 7-day expiry) — never exposed to JavaScript
+- Access tokens held in-memory only (React state + `web/src/api/tokenStore.ts`); recovered via silent refresh on page load
+- Auth API responses use `AuthResponseBodyDto` (access token + user, no refresh token in body)
+- Frontend auth requests use `credentials: 'include'`; CORS configured with `AllowCredentials()`
 - Auth endpoints rate-limited (configurable via `RateLimiting:Auth:PermitLimit`, default 10/min)
 - Docker containers run as non-root (`appuser` for API, `nginx` for web)
 - Web container listens on port 8080 (non-root can't bind <1024)
@@ -78,3 +82,4 @@ helm uninstall dog-door                        # Remove
 - Test project uses `Microsoft.NET.Sdk` (not Web SDK) — `AddRateLimiter()` not available; use `builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000")` in test factory
 - Two test factories: `CustomWebAppFactory` (TestAuthHandler, most tests) and `AuthWebAppFactory` (real JWT auth, auth integration tests)
 - SkiaSharp requires `SkiaSharp.NativeAssets.Linux` package for CI runners
+- Auth integration tests use `CookieContainerHandler` (DelegatingHandler) to track cookies in TestServer's in-memory transport
