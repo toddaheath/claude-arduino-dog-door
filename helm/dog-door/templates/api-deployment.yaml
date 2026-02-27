@@ -47,4 +47,5 @@ spec:
               mountPath: /app/uploads
       volumes:
         - name: uploads
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-uploads

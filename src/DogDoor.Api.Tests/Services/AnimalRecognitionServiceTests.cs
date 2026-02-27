@@ -2,6 +2,7 @@ using DogDoor.Api.Data;
 using DogDoor.Api.Models;
 using DogDoor.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using SkiaSharp;
 
 namespace DogDoor.Api.Tests.Services;
 
@@ -26,10 +27,21 @@ public class AnimalRecognitionServiceTests : IDisposable
         _db.Dispose();
     }
 
+    /// <summary>Create a minimal valid JPEG from a solid-color bitmap.</summary>
+    private static byte[] CreateTestJpeg(SKColor color)
+    {
+        using var bitmap = new SKBitmap(32, 32);
+        bitmap.Erase(color);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 90);
+        return data.ToArray();
+    }
+
     [Fact]
     public async Task IdentifyAsync_NoPhotos_ReturnsNoMatch()
     {
-        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        var jpegBytes = CreateTestJpeg(SKColors.Blue);
+        var stream = new MemoryStream(jpegBytes);
 
         var result = await _service.IdentifyAsync(stream, UserId);
 
@@ -52,12 +64,12 @@ public class AnimalRecognitionServiceTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        // Use a stream that produces a very different hash
-        var stream = new MemoryStream(new byte[] { 0x00, 0x00, 0x00, 0x00 });
+        // Use a different colored image — should produce a different hash
+        var jpegBytes = CreateTestJpeg(SKColors.Red);
+        var stream = new MemoryStream(jpegBytes);
 
         var result = await _service.IdentifyAsync(stream, UserId);
 
-        // The result depends on hash similarity - with different input, low confidence expected
         Assert.NotNull(result);
     }
 
@@ -68,24 +80,24 @@ public class AnimalRecognitionServiceTests : IDisposable
         _db.Animals.Add(animal);
         await _db.SaveChangesAsync();
 
-        // Compute the hash of known bytes, then store that hash
-        var testBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10 };
-        string expectedHash;
-        using (var sha = System.Security.Cryptography.SHA256.Create())
+        // Create a test image and compute its dHash
+        var jpegBytes = CreateTestJpeg(SKColors.Green);
+        string dHash;
+        using (var hashStream = new MemoryStream(jpegBytes))
         {
-            var hash = sha.ComputeHash(testBytes);
-            expectedHash = Convert.ToHexString(hash)[..16];
+            dHash = AnimalRecognitionService.ComputeDHash(hashStream);
         }
 
         _db.AnimalPhotos.Add(new AnimalPhoto
         {
             AnimalId = animal.Id,
             FilePath = "/test/photo.jpg",
-            PHash = expectedHash
+            PHash = dHash
         });
         await _db.SaveChangesAsync();
 
-        var stream = new MemoryStream(testBytes);
+        // Submit the exact same image bytes
+        var stream = new MemoryStream(jpegBytes);
         var result = await _service.IdentifyAsync(stream, UserId);
 
         Assert.Equal(animal.Id, result.AnimalId);
@@ -100,24 +112,23 @@ public class AnimalRecognitionServiceTests : IDisposable
         _db.Animals.Add(animal);
         await _db.SaveChangesAsync();
 
-        var testBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10 };
-        string expectedHash;
-        using (var sha = System.Security.Cryptography.SHA256.Create())
+        var jpegBytes = CreateTestJpeg(SKColors.Yellow);
+        string dHash;
+        using (var hashStream = new MemoryStream(jpegBytes))
         {
-            var hash = sha.ComputeHash(testBytes);
-            expectedHash = Convert.ToHexString(hash)[..16];
+            dHash = AnimalRecognitionService.ComputeDHash(hashStream);
         }
 
         _db.AnimalPhotos.Add(new AnimalPhoto
         {
             AnimalId = animal.Id,
             FilePath = "/test/photo.jpg",
-            PHash = expectedHash
+            PHash = dHash
         });
         await _db.SaveChangesAsync();
 
         // Same bytes, but scoped to UserId=1 — should not find the other user's animal
-        var stream = new MemoryStream(testBytes);
+        var stream = new MemoryStream(jpegBytes);
         var result = await _service.IdentifyAsync(stream, UserId);
 
         Assert.Null(result.AnimalId);

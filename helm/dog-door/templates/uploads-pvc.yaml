@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-uploads
+spec:
+  accessModes:
+    - {{ .Values.api.uploads.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.api.uploads.storageClassName }}
+  storageClassName: {{ .Values.api.uploads.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.api.uploads.size | default "5Gi" }}

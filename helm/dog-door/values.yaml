@@ -17,6 +17,10 @@ api:
     limits:
       cpu: 500m
       memory: 512Mi
+  uploads:
+    size: 5Gi
+    accessMode: ReadWriteOnce
+    storageClassName: ""
 
 web:
   enabled: true

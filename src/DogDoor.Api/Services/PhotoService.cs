@@ -111,12 +111,7 @@ public class PhotoService : IPhotoService
 
     private static string ComputePHash(string filePath)
     {
-        // Simplified perceptual hash: uses file bytes to generate a hash.
-        // In production, use a proper pHash library that resizes to 8x8,
-        // converts to grayscale, applies DCT, and computes median-based hash.
         using var stream = File.OpenRead(filePath);
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        var hash = sha.ComputeHash(stream);
-        return Convert.ToHexString(hash)[..16];
+        return AnimalRecognitionService.ComputeDHash(stream);
     }
 }

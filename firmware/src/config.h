@@ -19,11 +19,17 @@
 #define WIFI_RECONNECT_INTERVAL_MS 5000
 
 // ===== API Configuration =====
-#define API_BASE_URL "http://192.168.1.100:5001"
+#define API_BASE_URL "https://192.168.1.100:5001"
 #define API_ACCESS_ENDPOINT "/api/v1/doors/access-request"
 #define API_APPROACH_ENDPOINT "/api/v1/doors/approach-photo"
 #define API_KEY ""  // Set if door configuration has API key
 #define API_TIMEOUT_MS 10000
+// Set to 1 to skip server certificate verification (dev only).
+// For production, set to 0 and provide API_CA_CERT below.
+#define API_INSECURE_TLS 1
+// PEM-encoded CA certificate for server verification (when API_INSECURE_TLS=0).
+// Replace with your server's CA root certificate.
+#define API_CA_CERT ""
 
 // ===== Pin Definitions =====
 // Radar sensor (RCWL-0516)
@@ -85,8 +91,13 @@
 #define TFLITE_ARENA_SIZE 96 * 1024  // 96KB tensor arena
 
 // ===== Power Monitor (voltage divider R1=10kΩ, R2=3.3kΩ) =====
-#define PIN_POWER_ADC 34           // ADC1_CH6 input-only pin
-#define PIN_POWER_DETECT 35        // HIGH=main power present
+// IMPORTANT: On AI-Thinker ESP32-CAM, GPIO 34/35 are camera data lines (Y8/Y9).
+// The power monitor is DISABLED by default to avoid breaking the camera.
+// To enable, set POWER_MONITOR_ENABLED=1 and wire the voltage divider + detect
+// to free GPIOs on your specific board/wiring (not GPIO 34/35 on AI-Thinker).
+#define POWER_MONITOR_ENABLED 0
+#define PIN_POWER_ADC 34           // ADC1_CH6 — reassign if conflicts with camera
+#define PIN_POWER_DETECT 35        // HIGH=main power present — reassign if conflicts
 #define BATTERY_LOW_THRESHOLD_PCT 20
 #define BATTERY_CHARGED_THRESHOLD_PCT 95
 #define BATTERY_FULL_VOLTS 12.6f
@@ -106,6 +117,7 @@
 #define BLE_COMMAND_CHAR_UUID "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 #define BLE_WIFI_CHAR_UUID    "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 #define BLE_DEVICE_NAME "SmartDogDoor"
+#define BLE_PASSKEY 123456  // Change this! 6-digit numeric passkey for BLE pairing
 
 // ===== Offline Queue =====
 #define OFFLINE_QUEUE_MAX_EVENTS 50
