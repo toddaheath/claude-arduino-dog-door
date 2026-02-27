@@ -80,7 +80,6 @@ export interface UserSummary {
 
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   expiresAt: string;
   user: UserSummary;
 }

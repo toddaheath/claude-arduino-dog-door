@@ -10,11 +10,12 @@ import type {
   UpdateDoorConfiguration,
 } from '../types';
 import { authApi } from './auth';
+import { getAccessToken, setAccessToken } from './tokenStore';
 
 const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL || ''}/api/v1` });
 
 api.interceptors.request.use(config => {
-  const token = localStorage.getItem('accessToken');
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -26,8 +27,7 @@ let isRefreshing = false;
 let refreshPromise: Promise<string> | null = null;
 
 function clearSessionAndRedirect(): void {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
+  setAccessToken(null);
   localStorage.removeItem('currentUser');
   window.location.replace('/login');
 }
@@ -39,12 +39,6 @@ api.interceptors.response.use(
 
     // Only attempt refresh on 401, and only once per request
     if (error.response?.status !== 401 || originalRequest._retry) {
-      return Promise.reject(error);
-    }
-
-    const storedRefreshToken = localStorage.getItem('refreshToken');
-    if (!storedRefreshToken) {
-      clearSessionAndRedirect();
       return Promise.reject(error);
     }
 
@@ -65,11 +59,9 @@ api.interceptors.response.use(
     // Start a new refresh
     isRefreshing = true;
     refreshPromise = authApi
-      .refresh(storedRefreshToken)
+      .refresh()
       .then(response => {
-        // Save the new session to localStorage
-        localStorage.setItem('accessToken', response.accessToken);
-        localStorage.setItem('refreshToken', response.refreshToken);
+        setAccessToken(response.accessToken);
         localStorage.setItem('currentUser', JSON.stringify(response.user));
         return response.accessToken;
       })

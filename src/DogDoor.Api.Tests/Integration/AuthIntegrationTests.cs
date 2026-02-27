@@ -51,11 +51,71 @@ public class AuthIntegrationTests : IClassFixture<AuthWebAppFactory>
 {
     private readonly HttpClient _client;
     private readonly AuthWebAppFactory _factory;
+    private readonly CookieContainerHandler _cookieHandler;
+
+    /// <summary>
+    /// DelegatingHandler that manually tracks Set-Cookie / Cookie headers,
+    /// since TestServer's in-memory transport bypasses HttpClientHandler.CookieContainer.
+    /// </summary>
+    private class CookieContainerHandler : DelegatingHandler
+    {
+        private readonly Dictionary<string, string> _cookies = new(StringComparer.OrdinalIgnoreCase);
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            // Attach stored cookies to outgoing request
+            if (_cookies.Count > 0)
+            {
+                var cookieHeader = string.Join("; ", _cookies.Select(kv => $"{kv.Key}={kv.Value}"));
+                request.Headers.Add("Cookie", cookieHeader);
+            }
+
+            var response = await base.SendAsync(request, cancellationToken);
+
+            // Parse Set-Cookie headers from response
+            if (response.Headers.TryGetValues("Set-Cookie", out var setCookieHeaders))
+            {
+                foreach (var header in setCookieHeaders)
+                {
+                    var parts = header.Split(';', 2);
+                    var nameValue = parts[0].Trim();
+                    var eqIndex = nameValue.IndexOf('=');
+                    if (eqIndex <= 0) continue;
+
+                    var name = nameValue[..eqIndex];
+                    var value = nameValue[(eqIndex + 1)..];
+
+                    // Check for expiry in the past (cookie deletion)
+                    var lowerHeader = header.ToLowerInvariant();
+                    if (lowerHeader.Contains("expires=") && lowerHeader.Contains("thu, 01 jan 1970"))
+                    {
+                        _cookies.Remove(name);
+                    }
+                    else if (string.IsNullOrEmpty(value))
+                    {
+                        _cookies.Remove(name);
+                    }
+                    else
+                    {
+                        _cookies[name] = value;
+                    }
+                }
+            }
+
+            return response;
+        }
+
+        public bool HasCookie(string name) => _cookies.ContainsKey(name);
+    }
+
+    private record AuthResponseBody(string AccessToken, DateTime ExpiresAt, UserSummaryDto User);
 
     public AuthIntegrationTests(AuthWebAppFactory factory)
     {
         _factory = factory;
-        _client = factory.CreateClient();
+        _cookieHandler = new CookieContainerHandler();
+        _client = factory.CreateDefaultClient(_cookieHandler);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -63,11 +123,11 @@ public class AuthIntegrationTests : IClassFixture<AuthWebAppFactory>
     private static RegisterDto UniqueRegister(string tag = "") =>
         new($"auth-test{tag}-{Guid.NewGuid():N}@example.com", "Password1!", null, null);
 
-    private async Task<AuthResponseDto> RegisterAndGetTokens(RegisterDto dto)
+    private async Task<AuthResponseBody> RegisterAndGetTokens(RegisterDto dto)
     {
         var response = await _client.PostAsJsonAsync("/api/v1/auth/register", dto);
         response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var result = await response.Content.ReadFromJsonAsync<AuthResponseBody>();
         return result!;
     }
 
@@ -81,11 +141,12 @@ public class AuthIntegrationTests : IClassFixture<AuthWebAppFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseBody>();
         Assert.NotNull(auth);
         Assert.False(string.IsNullOrEmpty(auth.AccessToken));
-        Assert.False(string.IsNullOrEmpty(auth.RefreshToken));
         Assert.Equal(dto.Email, auth.User.Email);
+        // Refresh token should be in cookie, not in body
+        Assert.True(_cookieHandler.HasCookie("refresh_token"));
     }
 
     [Fact]
@@ -110,7 +171,7 @@ public class AuthIntegrationTests : IClassFixture<AuthWebAppFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseBody>();
         Assert.NotNull(auth);
         Assert.False(string.IsNullOrEmpty(auth.AccessToken));
     }
@@ -128,45 +189,59 @@ public class AuthIntegrationTests : IClassFixture<AuthWebAppFactory>
     }
 
     [Fact]
-    public async Task Refresh_WithValidToken_ReturnsNewTokens()
+    public async Task Refresh_WithValidCookie_ReturnsNewTokens()
     {
         var dto = UniqueRegister("-refresh");
-        var initial = await RegisterAndGetTokens(dto);
+        await RegisterAndGetTokens(dto);
 
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
-            new RefreshTokenRequestDto(initial.RefreshToken));
+        // Cookie is automatically sent by CookieContainerHandler
+        var response = await _client.PostAsync("/api/v1/auth/refresh", null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var refreshed = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var refreshed = await response.Content.ReadFromJsonAsync<AuthResponseBody>();
         Assert.NotNull(refreshed);
         Assert.False(string.IsNullOrEmpty(refreshed.AccessToken));
-        Assert.NotEqual(initial.RefreshToken, refreshed.RefreshToken);
     }
 
     [Fact]
     public async Task Logout_RevokesRefreshToken()
     {
         var dto = UniqueRegister("-logout");
-        var auth = await RegisterAndGetTokens(dto);
+        await RegisterAndGetTokens(dto);
 
-        var logoutResponse = await _client.PostAsJsonAsync("/api/v1/auth/logout",
-            new LogoutDto(auth.RefreshToken));
+        var logoutResponse = await _client.PostAsync("/api/v1/auth/logout", null);
         Assert.Equal(HttpStatusCode.NoContent, logoutResponse.StatusCode);
 
         // Refreshing after logout should fail
-        var refreshResponse = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
-            new RefreshTokenRequestDto(auth.RefreshToken));
+        var refreshResponse = await _client.PostAsync("/api/v1/auth/refresh", null);
         Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
     }
 
     [Fact]
     public async Task ProtectedEndpoint_WithoutToken_ReturnsUnauthorized()
     {
-        // Create a fresh client with no Authorization header
+        // Create a fresh client with no Authorization header and no cookies
         using var unauthClient = _factory.CreateClient();
         var response = await unauthClient.GetAsync("/api/v1/animals");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProtectedEndpoint_WithAccessToken_Succeeds()
+    {
+        var dto = UniqueRegister("-protected");
+        var auth = await RegisterAndGetTokens(dto);
+
+        // Use access token from response body in Authorization header
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var response = await _client.GetAsync("/api/v1/animals");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        // Clean up default header for other tests
+        _client.DefaultRequestHeaders.Authorization = null;
     }
 }
