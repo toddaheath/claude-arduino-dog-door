@@ -14,7 +14,7 @@ dotnet run
 # API runs at https://localhost:5001
 ```
 
-### Tests (59 tests, all passing)
+### Tests (79 tests, all passing)
 ```bash
 dotnet test src/DogDoor.Api.Tests
 # With coverage:
@@ -63,7 +63,18 @@ helm uninstall dog-door                        # Remove
 
 ## Key Conventions
 - API uses EF Core with PostgreSQL
-- Photos stored on filesystem under `uploads/`, paths in DB
+- Photos stored on filesystem under `uploads/`, relative paths in DB (resolved at read time)
 - ESP32 does on-device dog detection via TFLite Micro
 - API does dog identification via perceptual hashing (pHash)
 - All timestamps in UTC
+- Auth endpoints rate-limited (configurable via `RateLimiting:Auth:PermitLimit`, default 10/min)
+- Docker containers run as non-root (`appuser` for API, `nginx` for web)
+- Web container listens on port 8080 (non-root can't bind <1024)
+- Invitation tokens SHA-256 hashed in DB; password reset tokens BCrypt hashed with TokenPrefix for lookup
+- Firmware uses NVS encrypted storage for WiFi credentials (not LittleFS)
+- Firmware has 30s hardware watchdog (`esp_task_wdt`) — auto-reboots on hang
+
+## Testing Gotchas
+- Test project uses `Microsoft.NET.Sdk` (not Web SDK) — `AddRateLimiter()` not available; use `builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000")` in test factory
+- Two test factories: `CustomWebAppFactory` (TestAuthHandler, most tests) and `AuthWebAppFactory` (real JWT auth, auth integration tests)
+- SkiaSharp requires `SkiaSharp.NativeAssets.Linux` package for CI runners
