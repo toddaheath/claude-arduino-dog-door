@@ -15,4 +15,7 @@ void wifi_ensure_connected();
 // Get local IP address as string
 String wifi_get_ip();
 
+// Save WiFi credentials to NVS (encrypted storage)
+bool wifi_save_credentials(const char* ssid, const char* pass);
+
 #endif // WIFI_MANAGER_H

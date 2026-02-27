@@ -1,5 +1,6 @@
 using DogDoor.Api.Data;
 using Microsoft.EntityFrameworkCore;
+using SkiaSharp;
 
 namespace DogDoor.Api.Services;
 
@@ -14,10 +15,8 @@ public class AnimalRecognitionService : IAnimalRecognitionService
 
     public async Task<RecognitionResult> IdentifyAsync(Stream imageStream, int userId)
     {
-        // Compute hash of the incoming camera image
-        var imageHash = ComputeHash(imageStream);
+        var imageHash = ComputeDHash(imageStream);
 
-        // Compare against all stored animal photo hashes scoped to this user
         var photos = await _db.AnimalPhotos
             .Include(p => p.Animal)
             .Where(p => p.PHash != null && p.Animal.UserId == userId)
@@ -32,7 +31,7 @@ public class AnimalRecognitionService : IAnimalRecognitionService
             .Select(p => new
             {
                 Photo = p,
-                Similarity = ComputeHashSimilarity(imageHash, p.PHash!)
+                Similarity = ComputeHammingSimilarity(imageHash, p.PHash!)
             })
             .OrderByDescending(x => x.Similarity)
             .First();
@@ -48,25 +47,51 @@ public class AnimalRecognitionService : IAnimalRecognitionService
         return new RecognitionResult(null, null, bestMatch.Similarity);
     }
 
-    private static string ComputeHash(Stream stream)
+    /// <summary>
+    /// Compute a difference hash (dHash): resize to 9x8 grayscale, compare adjacent
+    /// horizontal pixels to produce a 64-bit hash. Robust to scaling, compression,
+    /// and minor color/brightness changes.
+    /// </summary>
+    public static string ComputeDHash(Stream stream)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        var hash = sha.ComputeHash(stream);
-        return Convert.ToHexString(hash)[..16];
-    }
+        using var bitmap = SKBitmap.Decode(stream);
+        if (bitmap is null) return new string('0', 16);
 
-    private static double ComputeHashSimilarity(string hash1, string hash2)
-    {
-        // Compare hex string hashes character by character.
-        // In production, use Hamming distance on actual perceptual hash bits.
-        if (hash1.Length != hash2.Length) return 0;
+        // Resize to 9x8 (9 wide so we get 8 horizontal differences per row)
+        using var resized = bitmap.Resize(new SKImageInfo(9, 8, SKColorType.Gray8), SKFilterQuality.Low);
+        if (resized is null) return new string('0', 16);
 
-        int matching = 0;
-        for (int i = 0; i < hash1.Length; i++)
+        ulong hash = 0;
+        int bit = 0;
+        for (int y = 0; y < 8; y++)
         {
-            if (hash1[i] == hash2[i]) matching++;
+            for (int x = 0; x < 8; x++)
+            {
+                var left = resized.GetPixel(x, y).Red;
+                var right = resized.GetPixel(x + 1, y).Red;
+                if (left > right)
+                    hash |= 1UL << bit;
+                bit++;
+            }
         }
 
-        return (double)matching / hash1.Length;
+        return hash.ToString("X16");
+    }
+
+    /// <summary>
+    /// Compute similarity as 1 - (hamming distance / total bits).
+    /// Two identical images produce 1.0; completely different images produce ~0.5.
+    /// </summary>
+    public static double ComputeHammingSimilarity(string hash1, string hash2)
+    {
+        if (hash1.Length != hash2.Length || hash1.Length == 0) return 0;
+
+        if (!ulong.TryParse(hash1, System.Globalization.NumberStyles.HexNumber, null, out var h1) ||
+            !ulong.TryParse(hash2, System.Globalization.NumberStyles.HexNumber, null, out var h2))
+            return 0;
+
+        var xor = h1 ^ h2;
+        int distance = System.Numerics.BitOperations.PopCount(xor);
+        return 1.0 - (double)distance / 64;
     }
 }

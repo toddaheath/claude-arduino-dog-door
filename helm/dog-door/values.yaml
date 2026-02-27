@@ -17,6 +17,10 @@ api:
     limits:
       cpu: 500m
       memory: 512Mi
+  uploads:
+    size: 5Gi
+    accessMode: ReadWriteOnce
+    storageClassName: ""
 
 web:
   enabled: true
@@ -25,7 +29,7 @@ web:
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
-  port: 80
+  port: 8080
   resources:
     requests:
       cpu: 50m

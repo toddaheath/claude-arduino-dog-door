@@ -48,4 +48,15 @@ public class AccessLogsController : ControllerBase
         if (log is null) return NotFound();
         return Ok(log);
     }
+
+    [HttpGet("{id}/image")]
+    public async Task<IActionResult> GetImage(int id, [FromQuery] int? asOwner = null)
+    {
+        var userId = await _userService.ResolveEffectiveUserIdAsync(CurrentUserId, asOwner);
+        var result = await _doorService.GetEventImageAsync(id, userId);
+        if (result is null) return NotFound();
+
+        var (stream, contentType) = result.Value;
+        return File(stream, contentType);
+    }
 }

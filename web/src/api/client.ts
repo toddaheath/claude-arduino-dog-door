@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
   Animal,
   CreateAnimal,
@@ -8,6 +9,7 @@ import type {
   DoorConfiguration,
   UpdateDoorConfiguration,
 } from '../types';
+import { authApi } from './auth';
 
 const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL || ''}/api/v1` });
 
@@ -19,16 +21,75 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+// --- Token refresh state (module-level to deduplicate concurrent 401s) ---
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
+
+function clearSessionAndRedirect(): void {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('currentUser');
+  window.location.replace('/login');
+}
+
 api.interceptors.response.use(
   response => response,
-  error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('currentUser');
-      window.location.replace('/login');
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Only attempt refresh on 401, and only once per request
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const storedRefreshToken = localStorage.getItem('refreshToken');
+    if (!storedRefreshToken) {
+      clearSessionAndRedirect();
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    // If a refresh is already in progress, wait for it instead of issuing another
+    if (isRefreshing && refreshPromise) {
+      try {
+        const newAccessToken = await refreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
+      } catch {
+        // Refresh failed; redirect already handled by the original refresh call
+        return Promise.reject(error);
+      }
+    }
+
+    // Start a new refresh
+    isRefreshing = true;
+    refreshPromise = authApi
+      .refresh(storedRefreshToken)
+      .then(response => {
+        // Save the new session to localStorage
+        localStorage.setItem('accessToken', response.accessToken);
+        localStorage.setItem('refreshToken', response.refreshToken);
+        localStorage.setItem('currentUser', JSON.stringify(response.user));
+        return response.accessToken;
+      })
+      .catch(refreshError => {
+        // Refresh failed — clear everything and redirect to login
+        clearSessionAndRedirect();
+        throw refreshError;
+      })
+      .finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
+
+    try {
+      const newAccessToken = await refreshPromise;
+      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+      return api(originalRequest);
+    } catch {
+      return Promise.reject(error);
+    }
   }
 );
 

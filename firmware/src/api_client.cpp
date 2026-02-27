@@ -3,7 +3,26 @@
 #include "network_manager.h"
 #include "offline_queue.h"
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
+
+static WiFiClientSecure& getSecureClient() {
+    static WiFiClientSecure client;
+    static bool initialized = false;
+    if (!initialized) {
+#if API_INSECURE_TLS
+        client.setInsecure();
+#else
+        if (strlen(API_CA_CERT) > 0) {
+            client.setCACert(API_CA_CERT);
+        } else {
+            client.setInsecure();
+        }
+#endif
+        initialized = true;
+    }
+    return client;
+}
 
 AccessResponse api_request_access(camera_fb_t* fb, const char* side) {
     AccessResponse response = {false, -1, "", 0.0f, "", "", false};
@@ -112,7 +131,7 @@ AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side) {
 
     HTTPClient http;
     String url = String(API_BASE_URL) + String(API_ACCESS_ENDPOINT);
-    http.begin(url);
+    http.begin(getSecureClient(), url);
     http.setTimeout(API_TIMEOUT_MS);
 
     String boundary = "----ESP32CAMBoundary";
@@ -195,7 +214,7 @@ bool api_post_approach_photo(camera_fb_t* fb, const char* side) {
 
     HTTPClient http;
     String url = String(API_BASE_URL) + String(API_APPROACH_ENDPOINT);
-    http.begin(url);
+    http.begin(getSecureClient(), url);
     http.setTimeout(API_TIMEOUT_MS);
 
     String boundary = "----ESP32CAMBoundary";

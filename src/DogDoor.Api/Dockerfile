@@ -14,6 +14,10 @@ COPY --from=build /app/publish .
 # Create uploads directory
 RUN mkdir -p /app/uploads
 
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN chown -R appuser:appgroup /app/uploads
+USER appuser
+
 ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 5000

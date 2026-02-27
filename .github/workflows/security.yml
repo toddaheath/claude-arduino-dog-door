@@ -71,7 +71,7 @@ jobs:
         run: |
           cd web
           npm ci
-          npm audit --audit-level=high || true
+          npm audit --audit-level=high
 
   docker-scan:
     name: Docker Image Scan
@@ -87,7 +87,7 @@ jobs:
         run: docker build -t dogdoor-web:scan -f web/Dockerfile web/
 
       - name: Run Trivy on API image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: dogdoor-api:scan
           severity: CRITICAL,HIGH
@@ -96,7 +96,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Run Trivy on Web image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: dogdoor-web:scan
           severity: CRITICAL,HIGH

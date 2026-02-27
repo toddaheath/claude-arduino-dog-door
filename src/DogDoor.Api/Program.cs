@@ -1,11 +1,11 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using DogDoor.Api.Data;
 using DogDoor.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -27,6 +27,14 @@ builder.Services.AddAutoMapper(typeof(Program));
 var jwtSecretKey = builder.Configuration["JWT:SecretKey"];
 if (!string.IsNullOrEmpty(jwtSecretKey))
 {
+    // Fail fast if someone deploys with the default placeholder secret
+    if (jwtSecretKey.Contains("change-me", StringComparison.OrdinalIgnoreCase) && !builder.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException(
+            "JWT:SecretKey contains the default placeholder value. " +
+            "Set a strong, unique secret key via environment variable or Helm --set before deploying.");
+    }
+
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
@@ -43,9 +51,15 @@ if (!string.IsNullOrEmpty(jwtSecretKey))
             };
         });
 }
+else if (!builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "JWT:SecretKey is required in non-development environments. " +
+        "Set it via JWT__SecretKey environment variable or configuration.");
+}
 else
 {
-    // Fallback for environments without JWT config (e.g., tests override this)
+    // Fallback for development/test environments without JWT config
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer();
 }
@@ -81,6 +95,20 @@ builder.Services.AddApiVersioning(options =>
 // Health checks
 builder.Services.AddHealthChecks();
 
+// Rate limiting for auth endpoints (brute-force protection)
+var rateLimitPermit = builder.Configuration.GetValue("RateLimiting:Auth:PermitLimit", 10);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = rateLimitPermit;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+});
+
 // Controllers
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -112,24 +140,18 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/healthz").AllowAnonymous();
 app.MapControllers();
 
-// Ensure uploads directory exists and serve as static files at /uploads/
+// Ensure uploads directory exists (photos served via authenticated PhotosController.GetFile)
 var uploadsPath = Path.Combine(app.Environment.ContentRootPath,
     builder.Configuration.GetValue<string>("PhotoStorage:BasePath") ?? "uploads");
 Directory.CreateDirectory(uploadsPath);
 Directory.CreateDirectory(Path.Combine(uploadsPath, "events"));
 Directory.CreateDirectory(Path.Combine(uploadsPath, "approach"));
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(uploadsPath),
-    RequestPath = "/uploads",
-    ContentTypeProvider = new FileExtensionContentTypeProvider()
-});
 
 // Run migrations (or EnsureCreated for non-relational, e.g., in-memory test DB)
 using (var scope = app.Services.CreateScope())

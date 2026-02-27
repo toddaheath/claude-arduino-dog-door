@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using DogDoor.Api.Data;
 using DogDoor.Api.DTOs;
 using DogDoor.Api.Models;
@@ -50,6 +51,9 @@ public class UserService : IUserService
         var user = await _db.Users.FindAsync(userId);
         if (user == null) return false;
 
+        // SSO-only users have no password hash — cannot change password
+        if (user.PasswordHash == null) return false;
+
         if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
             return false;
 
@@ -82,12 +86,13 @@ public class UserService : IUserService
             ?? throw new KeyNotFoundException("Owner not found");
 
         var rawToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+        var hashedToken = HashTokenSha256(rawToken);
 
         var invitation = new Invitation
         {
             InvitedById = userId,
             InviteeEmail = guestEmail,
-            Token = rawToken,
+            Token = hashedToken,
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             CreatedAt = DateTime.UtcNow
         };
@@ -103,8 +108,9 @@ public class UserService : IUserService
 
     public async Task AcceptInvitationAsync(string token, int guestUserId)
     {
+        var hashedToken = HashTokenSha256(token);
         var invitation = await _db.Invitations
-            .FirstOrDefaultAsync(i => i.Token == token && i.AcceptedAt == null && i.ExpiresAt > DateTime.UtcNow)
+            .FirstOrDefaultAsync(i => i.Token == hashedToken && i.AcceptedAt == null && i.ExpiresAt > DateTime.UtcNow)
             ?? throw new InvalidOperationException("Invalid or expired invitation token");
 
         // Create guest relationship
@@ -167,6 +173,12 @@ public class UserService : IUserService
             throw new UnauthorizedAccessException("Not a guest of the specified owner");
 
         return asOwner.Value;
+    }
+
+    private static string HashTokenSha256(string token)
+    {
+        var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static UserProfileDto MapToProfileDto(Models.User user) => new(

@@ -64,6 +64,7 @@ public class DogDoorDbContext : DbContext
         modelBuilder.Entity<PasswordResetToken>(entity =>
         {
             entity.HasIndex(e => e.Token).IsUnique();
+            entity.HasIndex(e => e.TokenPrefix);
 
             entity.HasOne(e => e.User)
                 .WithMany(u => u.PasswordResetTokens)

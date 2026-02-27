@@ -12,6 +12,9 @@ public class PasswordResetToken
     [MaxLength(512)]
     public string Token { get; set; } = string.Empty;
 
+    [MaxLength(8)]
+    public string? TokenPrefix { get; set; }
+
     public DateTime ExpiresAt { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

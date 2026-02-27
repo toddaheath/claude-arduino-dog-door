@@ -29,3 +29,6 @@ ingress:
 
 config:
   aspnetcoreEnvironment: Production
+
+secret:
+  jwtSecretKey: "production-override-set-real-secret-via-helm-set-in-deploy"

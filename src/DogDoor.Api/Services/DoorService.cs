@@ -92,7 +92,7 @@ public class DoorService : IDoorService
             }
         }
 
-        // Save incoming image (relative path stored in DB; served via /uploads/ static files)
+        // Save incoming image (relative path stored in DB; served via authenticated endpoint)
         var basePath = _config.GetValue<string>("PhotoStorage:BasePath") ?? "uploads";
         var eventImagesDir = Path.Combine(_env.ContentRootPath, basePath, "events");
         Directory.CreateDirectory(eventImagesDir);
@@ -256,6 +256,27 @@ public class DoorService : IDoorService
         int userId = doorConfig.UserId;
         await LogEventAsync(userId, null, eventType, null, batteryVoltage, notes, null, null);
         await _notificationService.NotifyAsync(userId, eventType, null, null, notes);
+    }
+
+    public async Task<(Stream Stream, string ContentType)?> GetEventImageAsync(int eventId, int userId)
+    {
+        var doorEvent = await _db.DoorEvents
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.UserId == userId);
+
+        if (doorEvent?.ImagePath is null) return null;
+
+        var basePath = _config.GetValue<string>("PhotoStorage:BasePath") ?? "uploads";
+        var fullPath = Path.Combine(_env.ContentRootPath, basePath, doorEvent.ImagePath);
+
+        if (!File.Exists(fullPath)) return null;
+
+        var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
+        var contentType = Path.GetExtension(fullPath).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            _ => "image/jpeg"
+        };
+        return (stream, contentType);
     }
 
     private async Task LogEventAsync(int userId, int? animalId, DoorEventType eventType, string? imagePath, double? confidence, string? notes, DoorSide? side = null, TransitDirection? direction = null)

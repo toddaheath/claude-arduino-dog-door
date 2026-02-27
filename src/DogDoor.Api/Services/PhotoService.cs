@@ -56,10 +56,13 @@ public class PhotoService : IPhotoService
         var fileInfo = new FileInfo(filePath);
         var pHash = ComputePHash(filePath);
 
+        // Store relative path from uploads root so paths survive base path changes
+        var relativePath = Path.Combine(animalId.ToString(), storedFileName);
+
         var photo = new AnimalPhoto
         {
             AnimalId = animalId,
-            FilePath = filePath,
+            FilePath = relativePath,
             FileName = fileName,
             PHash = pHash,
             FileSize = fileInfo.Length
@@ -77,9 +80,12 @@ public class PhotoService : IPhotoService
             .Include(p => p.Animal)
             .FirstOrDefaultAsync(p => p.Id == photoId && p.Animal.UserId == userId);
 
-        if (photo is null || !File.Exists(photo.FilePath)) return null;
+        if (photo is null) return null;
 
-        var ext = Path.GetExtension(photo.FilePath).ToLowerInvariant();
+        var fullPath = ResolveFullPath(photo.FilePath);
+        if (!File.Exists(fullPath)) return null;
+
+        var ext = Path.GetExtension(fullPath).ToLowerInvariant();
         var contentType = ext switch
         {
             ".jpg" or ".jpeg" => "image/jpeg",
@@ -87,7 +93,7 @@ public class PhotoService : IPhotoService
             _ => "application/octet-stream"
         };
 
-        var stream = new FileStream(photo.FilePath, FileMode.Open, FileAccess.Read);
+        var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
         return (stream, contentType);
     }
 
@@ -99,9 +105,10 @@ public class PhotoService : IPhotoService
 
         if (photo is null) return false;
 
-        if (File.Exists(photo.FilePath))
+        var fullPath = ResolveFullPath(photo.FilePath);
+        if (File.Exists(fullPath))
         {
-            File.Delete(photo.FilePath);
+            File.Delete(fullPath);
         }
 
         _db.AnimalPhotos.Remove(photo);
@@ -109,14 +116,18 @@ public class PhotoService : IPhotoService
         return true;
     }
 
+    private string ResolveFullPath(string storedPath)
+    {
+        // If the stored path is already absolute (legacy data), return as-is
+        if (Path.IsPathRooted(storedPath)) return storedPath;
+
+        var basePath = _config.GetValue<string>("PhotoStorage:BasePath") ?? "uploads";
+        return Path.Combine(_env.ContentRootPath, basePath, storedPath);
+    }
+
     private static string ComputePHash(string filePath)
     {
-        // Simplified perceptual hash: uses file bytes to generate a hash.
-        // In production, use a proper pHash library that resizes to 8x8,
-        // converts to grayscale, applies DCT, and computes median-based hash.
         using var stream = File.OpenRead(filePath);
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        var hash = sha.ComputeHash(stream);
-        return Convert.ToHexString(hash)[..16];
+        return AnimalRecognitionService.ComputeDHash(stream);
     }
 }

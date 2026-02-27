@@ -11,6 +11,9 @@ public class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly IEmailService _emailService;
 
+    // Pre-computed dummy hash for timing-safe login (prevents user enumeration)
+    private static readonly string DummyHash = BCrypt.Net.BCrypt.HashPassword("dummy-timing-safe", 12);
+
     public AuthService(DogDoorDbContext db, IJwtService jwtService, IEmailService emailService)
     {
         _db = db;
@@ -28,37 +31,60 @@ public class AuthService : IAuthService
 
         string passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, 12);
 
-        var user = new User
+        // Wrap user + door config creation in a transaction so both succeed or both roll back
+        var useTransaction = _db.Database.IsRelational();
+        var tx = useTransaction ? await _db.Database.BeginTransactionAsync() : null;
+        try
         {
-            Email = dto.Email,
-            PasswordHash = passwordHash,
-            FirstName = dto.FirstName,
-            LastName = dto.LastName,
-            CreatedAt = DateTime.UtcNow,
-            EmailVerified = false
-        };
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+            var user = new User
+            {
+                Email = dto.Email,
+                PasswordHash = passwordHash,
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                CreatedAt = DateTime.UtcNow,
+                EmailVerified = false
+            };
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
 
-        var doorConfig = new DoorConfiguration
+            var doorConfig = new DoorConfiguration
+            {
+                UserId = user.Id,
+                IsEnabled = true,
+                AutoCloseEnabled = true,
+                AutoCloseDelaySeconds = 10,
+                MinConfidenceThreshold = 0.7,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _db.DoorConfigurations.Add(doorConfig);
+            await _db.SaveChangesAsync();
+
+            if (tx != null) await tx.CommitAsync();
+
+            return await CreateAuthResponseAsync(user);
+        }
+        catch
         {
-            UserId = user.Id,
-            IsEnabled = true,
-            AutoCloseEnabled = true,
-            AutoCloseDelaySeconds = 10,
-            MinConfidenceThreshold = 0.7,
-            UpdatedAt = DateTime.UtcNow
-        };
-        _db.DoorConfigurations.Add(doorConfig);
-        await _db.SaveChangesAsync();
-
-        return await CreateAuthResponseAsync(user);
+            if (tx != null) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            tx?.Dispose();
+        }
     }
 
     public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
-        if (user == null) return null;
+        if (user == null)
+        {
+            // Timing-safe: run BCrypt.Verify against dummy hash so response time
+            // is indistinguishable from a wrong-password attempt
+            BCrypt.Net.BCrypt.Verify(dto.Password, DummyHash);
+            return null;
+        }
 
         if (user.PasswordHash == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return null;
@@ -103,6 +129,7 @@ public class AuthService : IAuthService
         {
             UserId = user.Id,
             Token = hashedToken,
+            TokenPrefix = rawToken[..8],
             ExpiresAt = DateTime.UtcNow.AddHours(1),
             CreatedAt = DateTime.UtcNow
         };
@@ -114,13 +141,14 @@ public class AuthService : IAuthService
 
     public async Task ResetPasswordAsync(ResetPasswordDto dto)
     {
-        // Find unexpired, unused reset tokens and check BCrypt hash
-        var tokens = await _db.PasswordResetTokens
+        // Use TokenPrefix to narrow the query to ~1 row instead of loading all active tokens
+        var prefix = dto.Token[..8];
+        var candidates = await _db.PasswordResetTokens
             .Include(t => t.User)
-            .Where(t => !t.IsUsed && t.ExpiresAt > DateTime.UtcNow)
+            .Where(t => !t.IsUsed && t.ExpiresAt > DateTime.UtcNow && t.TokenPrefix == prefix)
             .ToListAsync();
 
-        var matchingToken = tokens.FirstOrDefault(t => BCrypt.Net.BCrypt.Verify(dto.Token, t.Token));
+        var matchingToken = candidates.FirstOrDefault(t => BCrypt.Net.BCrypt.Verify(dto.Token, t.Token));
         if (matchingToken == null)
             throw new InvalidOperationException("Invalid or expired reset token");
 

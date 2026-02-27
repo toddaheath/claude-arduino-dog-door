@@ -3,7 +3,19 @@
 #include "offline_queue.h"
 #include <Arduino.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
+
+#if !POWER_MONITOR_ENABLED
+
+void power_monitor_init() {
+    Serial.println("[SKIP] Power monitor disabled (GPIO conflict with camera)");
+}
+float power_monitor_read_voltage() { return 0.0f; }
+int power_monitor_battery_percent() { return -1; }
+void power_monitor_update(const char*, const char*) {}
+
+#else // POWER_MONITOR_ENABLED
 
 static bool _lastMainPower = true;
 static bool _lastBatteryLow = false;
@@ -69,6 +81,24 @@ void power_monitor_update(const char* apiKey, const char* baseUrl) {
     }
 }
 
+static WiFiClientSecure& getPowerSecureClient() {
+    static WiFiClientSecure client;
+    static bool initialized = false;
+    if (!initialized) {
+#if API_INSECURE_TLS
+        client.setInsecure();
+#else
+        if (strlen(API_CA_CERT) > 0) {
+            client.setCACert(API_CA_CERT);
+        } else {
+            client.setInsecure();
+        }
+#endif
+        initialized = true;
+    }
+    return client;
+}
+
 static void post_firmware_event(const char* apiKey, const char* baseUrl, const char* eventType, const char* notes, float voltage) {
     JsonDocument doc;
     doc["apiKey"] = apiKey;
@@ -81,7 +111,7 @@ static void post_firmware_event(const char* apiKey, const char* baseUrl, const c
 
     String url = String(baseUrl) + String(API_FIRMWARE_EVENT_ENDPOINT);
     HTTPClient http;
-    http.begin(url);
+    http.begin(getPowerSecureClient(), url);
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(API_TIMEOUT_MS);
 
@@ -99,3 +129,5 @@ static void post_firmware_event(const char* apiKey, const char* baseUrl, const c
         offline_queue_push(evt);
     }
 }
+
+#endif // POWER_MONITOR_ENABLED
