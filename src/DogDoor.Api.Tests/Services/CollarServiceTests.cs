@@ -56,6 +56,35 @@ public class CollarServiceTests : IDisposable
     // ── CRUD ─────────────────────────────────────────────
 
     [Fact]
+    public async Task GetCollars_ReturnsOnlyOwnedCollars()
+    {
+        await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Mine1", null));
+        await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Mine2", null));
+
+        // Create collar for different user
+        _db.Users.Add(new User { Id = 999, Email = "other@test.com", PasswordHash = "h" });
+        await _db.SaveChangesAsync();
+        await _service.RegisterCollarAsync(999, new CreateCollarDeviceDto("NotMine", null));
+
+        var collars = (await _service.GetCollarsAsync(UserId)).ToList();
+
+        Assert.Equal(2, collars.Count);
+        Assert.All(collars, c => Assert.StartsWith("Mine", c.Name));
+    }
+
+    [Fact]
+    public async Task GetCollar_ReturnsCollarForOwner()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("OwnedCollar", 1));
+
+        var result = await _service.GetCollarAsync(UserId, pairing.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal("OwnedCollar", result!.Name);
+        Assert.Equal("Rex", result.AnimalName);
+    }
+
+    [Fact]
     public async Task GetCollar_ReturnsNullForOtherUser()
     {
         var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("MyCollar", null));

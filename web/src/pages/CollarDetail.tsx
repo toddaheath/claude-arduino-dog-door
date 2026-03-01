@@ -248,6 +248,10 @@ export default function CollarDetail() {
               <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{activity.maxSpeedMps.toFixed(1)} m/s</div>
             </div>
             <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Avg Speed</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{activity.avgSpeedMps.toFixed(1)} m/s</div>
+            </div>
+            <div>
               <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>GPS Points</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{activity.locationPointCount}</div>
             </div>
