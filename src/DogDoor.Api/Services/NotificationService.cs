@@ -80,6 +80,10 @@ public class NotificationService : INotificationService
             DoorEventType.PowerRestored => prefs.PowerRestored,
             DoorEventType.BatteryLow => prefs.BatteryLow,
             DoorEventType.BatteryCharged => prefs.BatteryCharged,
+            DoorEventType.GeofenceBreach => prefs.GeofenceBreach,
+            DoorEventType.GeofenceEntered or DoorEventType.GeofenceExited => prefs.GeofenceEnteredExited,
+            DoorEventType.CollarBatteryLow => prefs.CollarBatteryLow,
+            DoorEventType.CollarDisconnected => prefs.CollarDisconnected,
             _ => false
         };
     }
@@ -98,6 +102,11 @@ public class NotificationService : INotificationService
             DoorEventType.PowerRestored => "Dog Door: Power restored",
             DoorEventType.BatteryLow => "Dog Door: Battery low",
             DoorEventType.BatteryCharged => "Dog Door: Battery charged",
+            DoorEventType.GeofenceBreach => $"Collar: {animalName ?? "Your dog"} left a geofence!",
+            DoorEventType.GeofenceEntered => $"Collar: {animalName ?? "Your dog"} entered a geofence",
+            DoorEventType.GeofenceExited => $"Collar: {animalName ?? "Your dog"} left a geofence",
+            DoorEventType.CollarBatteryLow => $"Collar: {animalName ?? "Dog"}'s collar battery is low",
+            DoorEventType.CollarDisconnected => $"Collar: {animalName ?? "Dog"}'s collar disconnected",
             _ => "Dog Door: Event notification"
         };
     }
@@ -118,6 +127,11 @@ public class NotificationService : INotificationService
             DoorEventType.PowerRestored => "Main power has been restored.",
             DoorEventType.BatteryLow => "Battery level is low. Please check the power supply.",
             DoorEventType.BatteryCharged => "Battery is fully charged.",
+            DoorEventType.GeofenceBreach => $"{animalName ?? "Your dog"} has breached a geofence boundary.{(notes != null ? $" Zone: {notes}" : "")}",
+            DoorEventType.GeofenceEntered => $"{animalName ?? "Your dog"} entered a geofence zone.{(notes != null ? $" Zone: {notes}" : "")}",
+            DoorEventType.GeofenceExited => $"{animalName ?? "Your dog"} left a geofence zone.{(notes != null ? $" Zone: {notes}" : "")}",
+            DoorEventType.CollarBatteryLow => $"{animalName ?? "Dog"}'s collar battery is low. Please charge soon.",
+            DoorEventType.CollarDisconnected => $"{animalName ?? "Dog"}'s collar has not been seen for an extended period.",
             _ => notes ?? "A door event occurred."
         };
     }

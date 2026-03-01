@@ -210,7 +210,11 @@ public class ApiIntegrationTests : IClassFixture<CustomWebAppFactory>
             PowerDisconnected: null,
             PowerRestored: null,
             BatteryLow: null,
-            BatteryCharged: null);
+            BatteryCharged: null,
+            GeofenceBreach: null,
+            GeofenceEnteredExited: null,
+            CollarBatteryLow: null,
+            CollarDisconnected: null);
 
         var putResponse = await _client.PutAsJsonAsync("/api/v1/users/me/notifications", update);
         putResponse.EnsureSuccessStatusCode();

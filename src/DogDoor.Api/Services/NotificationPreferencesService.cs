@@ -53,6 +53,10 @@ public class NotificationPreferencesService : INotificationPreferencesService
         if (dto.PowerRestored.HasValue) prefs.PowerRestored = dto.PowerRestored.Value;
         if (dto.BatteryLow.HasValue) prefs.BatteryLow = dto.BatteryLow.Value;
         if (dto.BatteryCharged.HasValue) prefs.BatteryCharged = dto.BatteryCharged.Value;
+        if (dto.GeofenceBreach.HasValue) prefs.GeofenceBreach = dto.GeofenceBreach.Value;
+        if (dto.GeofenceEnteredExited.HasValue) prefs.GeofenceEnteredExited = dto.GeofenceEnteredExited.Value;
+        if (dto.CollarBatteryLow.HasValue) prefs.CollarBatteryLow = dto.CollarBatteryLow.Value;
+        if (dto.CollarDisconnected.HasValue) prefs.CollarDisconnected = dto.CollarDisconnected.Value;
         prefs.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();

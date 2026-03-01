@@ -3,17 +3,20 @@ using System;
 using DogDoor.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace DogDoor.Api.Migrations
+namespace DogDoor.Api.Data.Migrations
 {
     [DbContext(typeof(DogDoorDbContext))]
-    partial class DogDoorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260301160412_AddCollarNotificationPreferences")]
+    partial class AddCollarNotificationPreferences
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

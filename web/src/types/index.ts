@@ -133,6 +133,10 @@ export interface NotificationPreferences {
   powerRestored: boolean;
   batteryLow: boolean;
   batteryCharged: boolean;
+  geofenceBreach: boolean;
+  geofenceEnteredExited: boolean;
+  collarBatteryLow: boolean;
+  collarDisconnected: boolean;
 }
 
 export type UpdateNotificationPreferences = Partial<NotificationPreferences>;
