@@ -10,6 +10,7 @@
 #include "geofence.h"
 #include "buzzer.h"
 #include "storage.h"
+#include "nfc_auth.h"
 
 // ── State Machine ───────────────────────────────────────────
 typedef enum {
@@ -114,6 +115,13 @@ void setup() {
     storage_load_wifi_creds();
     storage_load_collar_identity();
 
+    // Initialize NFC and load credentials
+    if (nfc_init()) {
+        Serial.println("[OK] NFC (PN532) initialized");
+    } else {
+        Serial.println("[WARN] NFC not available");
+    }
+
     // Check wake reason
     esp_sleep_wakeup_cause_t wake_reason = esp_sleep_get_wakeup_cause();
     if (wake_reason == ESP_SLEEP_WAKEUP_EXT0) {
@@ -183,8 +191,11 @@ void loop() {
                 ble_update_activity(imu_get_activity());
             }
 
-            // Check for door proximity -> activate NFC (Phase 2)
-            // NFC activation will be added in Phase 2
+            // Check for door proximity -> activate NFC authentication
+            if (ble_door_nearby && nfc_field_detected()) {
+                state = STATE_NFC_READY;
+                break;
+            }
 
             // Periodic WiFi upload
             if (now - last_upload_time > WIFI_UPLOAD_INTERVAL_MS &&
@@ -211,6 +222,23 @@ void loop() {
 
             // Update battery via BLE
             ble_update_battery(power_get_percentage(), power_is_charging());
+            break;
+        }
+
+        case STATE_NFC_READY: {
+            Serial.println("[NFC] Door detected nearby, starting authentication");
+
+            bool auth_ok = nfc_authenticate();
+            if (auth_ok) {
+                Serial.println("[NFC] Authentication handshake completed");
+                buzzer_play(BUZZ_SHORT); // Confirmation beep
+            } else {
+                Serial.println("[NFC] Authentication failed or timed out");
+            }
+
+            // Return to GPS tracking regardless of outcome
+            // (door-side verification is done server-side via the access request)
+            state = STATE_GPS_TRACKING;
             break;
         }
 
