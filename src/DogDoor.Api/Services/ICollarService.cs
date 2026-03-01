@@ -19,6 +19,9 @@ public interface ICollarService
     Task<IEnumerable<LocationQueryDto>> GetLocationHistoryAsync(int collarId, DateTime from, DateTime to);
     Task<CurrentLocationDto?> GetCurrentLocationAsync(int collarId);
 
+    // Activity
+    Task<ActivitySummaryDto?> GetActivitySummaryAsync(int userId, int collarId, DateTime from, DateTime to);
+
     // Firmware
     Task<FirmwareCheckDto> CheckFirmwareAsync(string collarId, string currentVersion);
     Task<(Stream? Stream, string? ContentType, long? Length)?> DownloadFirmwareAsync(string collarId);

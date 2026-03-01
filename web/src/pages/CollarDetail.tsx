@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationHistory, getGeofences, getFirmwareReleases, uploadFirmware } from '../api/collars';
+import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationHistory, getActivitySummary, getGeofences, getFirmwareReleases, uploadFirmware } from '../api/collars';
 import { getAnimals } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useToast } from '../contexts/ToastContext';
@@ -17,6 +17,7 @@ export default function CollarDetail() {
   const { data: currentLoc } = useApi(() => getCurrentLocation(collarId).catch(() => null), [collarId]);
   const { data: history } = useApi(() => getLocationHistory(collarId), [collarId]);
   const { data: geofences } = useApi(getGeofences);
+  const { data: activity } = useApi(() => getActivitySummary(collarId).catch(() => null), [collarId]);
   const { data: firmwareReleases, reload: reloadFirmware } = useApi(getFirmwareReleases);
 
   const [editing, setEditing] = useState(false);
@@ -176,6 +177,41 @@ export default function CollarDetail() {
             <div style={{ color: 'var(--text-muted)' }}>No location data available</div>
           )}
         </div>
+      </div>
+
+      {/* Activity Summary */}
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <h3>Activity (Last 24h)</h3>
+        {activity ? (
+          <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Distance</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                {activity.totalDistanceMeters >= 1000
+                  ? `${(activity.totalDistanceMeters / 1000).toFixed(1)} km`
+                  : `${Math.round(activity.totalDistanceMeters)} m`}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Active Time</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                {activity.activeMinutes >= 60
+                  ? `${Math.floor(activity.activeMinutes / 60)}h ${activity.activeMinutes % 60}m`
+                  : `${activity.activeMinutes} min`}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Max Speed</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{activity.maxSpeedMps.toFixed(1)} m/s</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>GPS Points</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{activity.locationPointCount}</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: 'var(--text-muted)' }}>No activity data available</div>
+        )}
       </div>
 
       {/* Location History */}

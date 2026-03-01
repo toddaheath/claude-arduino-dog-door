@@ -198,6 +198,74 @@ public class CollarService : ICollarService
         );
     }
 
+    public async Task<ActivitySummaryDto?> GetActivitySummaryAsync(int userId, int collarId, DateTime from, DateTime to)
+    {
+        var collar = await _db.CollarDevices.FirstOrDefaultAsync(c => c.Id == collarId && c.UserId == userId);
+        if (collar == null) return null;
+
+        var points = await _db.LocationPoints
+            .Where(p => p.CollarDeviceId == collarId && p.Timestamp >= from && p.Timestamp <= to)
+            .OrderBy(p => p.Timestamp)
+            .ToListAsync();
+
+        if (points.Count == 0)
+            return new ActivitySummaryDto(0, 0, 0, 0, 0, from, to);
+
+        double totalDistance = 0;
+        double maxSpeed = 0;
+        double speedSum = 0;
+        int speedCount = 0;
+        int activeMinutes = 0;
+        DateTime? lastActiveMinute = null;
+
+        for (int i = 1; i < points.Count; i++)
+        {
+            var prev = points[i - 1];
+            var curr = points[i];
+
+            // Haversine distance
+            totalDistance += HaversineDistance(prev.Latitude, prev.Longitude, curr.Latitude, curr.Longitude);
+
+            if (curr.Speed.HasValue && curr.Speed.Value > 0.2f)
+            {
+                speedSum += curr.Speed.Value;
+                speedCount++;
+                if (curr.Speed.Value > maxSpeed) maxSpeed = curr.Speed.Value;
+
+                // Count active minutes (distinct minutes where speed > 0.2 m/s)
+                var minuteKey = new DateTime(curr.Timestamp.Year, curr.Timestamp.Month, curr.Timestamp.Day,
+                    curr.Timestamp.Hour, curr.Timestamp.Minute, 0);
+                if (lastActiveMinute != minuteKey)
+                {
+                    activeMinutes++;
+                    lastActiveMinute = minuteKey;
+                }
+            }
+        }
+
+        return new ActivitySummaryDto(
+            Math.Round(totalDistance, 1),
+            activeMinutes,
+            Math.Round(maxSpeed, 2),
+            speedCount > 0 ? Math.Round(speedSum / speedCount, 2) : 0,
+            points.Count,
+            points.First().Timestamp,
+            points.Last().Timestamp
+        );
+    }
+
+    private static double HaversineDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371000; // Earth radius in meters
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return R * c;
+    }
+
     public async Task<FirmwareCheckDto> CheckFirmwareAsync(string collarId, string currentVersion)
     {
         var collar = await _db.CollarDevices.FirstOrDefaultAsync(c => c.CollarId == collarId);

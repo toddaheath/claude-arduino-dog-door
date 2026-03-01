@@ -14,7 +14,7 @@ dotnet run
 # API runs at https://localhost:5001
 ```
 
-### Tests (137 tests, all passing)
+### Tests (140 tests, all passing)
 ```bash
 dotnet test src/DogDoor.Api.Tests
 # With coverage:

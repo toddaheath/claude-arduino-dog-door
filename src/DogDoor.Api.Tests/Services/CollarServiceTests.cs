@@ -290,6 +290,62 @@ public class CollarServiceTests : IDisposable
         Assert.Equal("1.5.0", collar!.FirmwareVersion);
     }
 
+    // ── Activity Summary ───────────────────────────────────
+
+    [Fact]
+    public async Task GetActivitySummary_WithPoints_ComputesMetrics()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("ActivityCollar", null));
+
+        var baseTime = DateTime.UtcNow.AddHours(-1);
+        for (int i = 0; i < 10; i++)
+        {
+            _db.LocationPoints.Add(new LocationPoint
+            {
+                CollarDeviceId = pairing.Id,
+                Latitude = 40.0 + (i * 0.001),
+                Longitude = -105.0,
+                Speed = 1.5f,
+                Timestamp = baseTime.AddMinutes(i * 5),
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        var summary = await _service.GetActivitySummaryAsync(UserId, pairing.Id,
+            DateTime.UtcNow.AddHours(-2), DateTime.UtcNow);
+
+        Assert.NotNull(summary);
+        Assert.Equal(10, summary!.LocationPointCount);
+        Assert.True(summary.TotalDistanceMeters > 500);
+        Assert.True(summary.ActiveMinutes > 0);
+        Assert.Equal(1.5, summary.MaxSpeedMps, 1);
+    }
+
+    [Fact]
+    public async Task GetActivitySummary_NoPoints_ReturnsZeros()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("EmptyActivity", null));
+
+        var summary = await _service.GetActivitySummaryAsync(UserId, pairing.Id,
+            DateTime.UtcNow.AddHours(-2), DateTime.UtcNow);
+
+        Assert.NotNull(summary);
+        Assert.Equal(0, summary!.LocationPointCount);
+        Assert.Equal(0, summary.TotalDistanceMeters);
+        Assert.Equal(0, summary.ActiveMinutes);
+    }
+
+    [Fact]
+    public async Task GetActivitySummary_OtherUser_ReturnsNull()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("OtherActivity", null));
+
+        var summary = await _service.GetActivitySummaryAsync(999, pairing.Id,
+            DateTime.UtcNow.AddHours(-2), DateTime.UtcNow);
+
+        Assert.Null(summary);
+    }
+
     [Fact]
     public async Task GetFirmwareReleases_ReturnsAllReleases()
     {

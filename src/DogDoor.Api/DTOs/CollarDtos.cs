@@ -176,3 +176,15 @@ public record FirmwareCheckDto(
     long? FileSize,
     string? ReleaseNotes
 );
+
+// ── Activity Summary ───────────────────────────────────────
+
+public record ActivitySummaryDto(
+    double TotalDistanceMeters,
+    int ActiveMinutes,
+    double MaxSpeedMps,
+    double AvgSpeedMps,
+    int LocationPointCount,
+    DateTime PeriodStart,
+    DateTime PeriodEnd
+);

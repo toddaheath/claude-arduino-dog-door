@@ -240,6 +240,16 @@ export interface GeofenceEvent {
   timestamp: string;
 }
 
+export interface ActivitySummary {
+  totalDistanceMeters: number;
+  activeMinutes: number;
+  maxSpeedMps: number;
+  avgSpeedMps: number;
+  locationPointCount: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
 export interface FirmwareRelease {
   id: number;
   version: string;

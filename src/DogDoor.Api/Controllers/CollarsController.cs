@@ -133,6 +133,25 @@ public class CollarsController : ControllerBase
         return Ok(location);
     }
 
+    // ── Activity Summary ──────────────────────────────────────
+
+    /// <summary>
+    /// Get activity summary (distance, speed, active time) derived from GPS data.
+    /// </summary>
+    [HttpGet("{id:int}/activity")]
+    public async Task<ActionResult<ActivitySummaryDto>> GetActivity(
+        int id,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
+    {
+        var fromDate = from ?? DateTime.UtcNow.AddHours(-24);
+        var toDate = to ?? DateTime.UtcNow;
+
+        var summary = await _collarService.GetActivitySummaryAsync(GetUserId(), id, fromDate, toDate);
+        if (summary == null) return NotFound();
+        return Ok(summary);
+    }
+
     // ── Firmware Management ──────────────────────────────────
 
     /// <summary>

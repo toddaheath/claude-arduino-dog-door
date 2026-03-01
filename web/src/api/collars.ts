@@ -6,6 +6,7 @@ import type {
   CollarPairingResult,
   LocationPoint,
   CurrentLocation,
+  ActivitySummary,
   Geofence,
   CreateGeofence,
   UpdateGeofence,
@@ -78,6 +79,15 @@ export const getGeofenceEvents = (geofenceId?: number, from?: string, to?: strin
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   return api.get<GeofenceEvent[]>(`/geofences/events?${params}`).then(r => r.data);
+};
+
+// ── Activity ──────────────────────────────────────────────
+
+export const getActivitySummary = (collarId: number, from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return api.get<ActivitySummary>(`/collars/${collarId}/activity?${params}`).then(r => r.data);
 };
 
 // ── Firmware ───────────────────────────────────────────────
