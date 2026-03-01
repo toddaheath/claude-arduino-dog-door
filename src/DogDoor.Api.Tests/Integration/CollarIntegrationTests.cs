@@ -295,6 +295,68 @@ public class CollarIntegrationTests : IClassFixture<CustomWebAppFactory>
         Assert.True(result!.Verified);
     }
 
+    // ── Activity Summary ──────────────────────────────────────
+
+    [Fact]
+    public async Task GetActivity_WithLocationData_ReturnsMetrics()
+    {
+        var dto = new CreateCollarDeviceDto("ActivityCollar", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        // Upload several location points with speed data
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var batch = new LocationBatchDto(null, Enumerable.Range(0, 10).Select(i =>
+            new LocationPointDto(40.0 + (i * 0.001), -105.0, null, 2.0f, 1.5f, null, null, null, now - (10 - i) * 300)
+        ).ToArray());
+
+        await _client.PostAsJsonAsync($"/api/v1/collars/{pairing!.CollarId}/locations", batch);
+
+        var response = await _client.GetAsync($"/api/v1/collars/{pairing.Id}/activity");
+        response.EnsureSuccessStatusCode();
+        var summary = await response.Content.ReadFromJsonAsync<ActivitySummaryDto>();
+        Assert.NotNull(summary);
+        Assert.Equal(10, summary!.LocationPointCount);
+        Assert.True(summary.TotalDistanceMeters > 0);
+        Assert.True(summary.ActiveMinutes > 0);
+    }
+
+    [Fact]
+    public async Task GetActivity_NoData_ReturnsZeros()
+    {
+        var dto = new CreateCollarDeviceDto("EmptyActivityCollar", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        var response = await _client.GetAsync($"/api/v1/collars/{pairing!.Id}/activity");
+        response.EnsureSuccessStatusCode();
+        var summary = await response.Content.ReadFromJsonAsync<ActivitySummaryDto>();
+        Assert.NotNull(summary);
+        Assert.Equal(0, summary!.LocationPointCount);
+        Assert.Equal(0, summary.TotalDistanceMeters);
+    }
+
+    [Fact]
+    public async Task GetActivity_OtherUser_ReturnsNotFound()
+    {
+        var dto = new CreateCollarDeviceDto("OtherUserActivity", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, "996");
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DogDoorDbContext>();
+        if (!db.Users.Any(u => u.Id == 996))
+        {
+            db.Users.Add(new User { Id = 996, Email = "activity996@example.com", PasswordHash = "h" });
+            db.SaveChanges();
+        }
+
+        var response = await otherClient.GetAsync($"/api/v1/collars/{pairing!.Id}/activity");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ── Firmware Management ──────────────────────────────────
 
     [Fact]
