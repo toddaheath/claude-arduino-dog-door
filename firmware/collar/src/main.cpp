@@ -115,9 +115,15 @@ void setup() {
     storage_load_wifi_creds();
     storage_load_collar_identity();
 
-    // Initialize NFC and load credentials
+    // Initialize NFC and load credentials from NVS
     if (nfc_init()) {
         Serial.println("[OK] NFC (PN532) initialized");
+        const char* cid = storage_get_collar_id();
+        const uint8_t* secret = storage_get_shared_secret();
+        if (cid[0] != '\0') {
+            nfc_set_credentials(cid, secret, NFC_SHARED_SECRET_LEN);
+            Serial.printf("[OK] NFC credentials loaded for collar %s\n", cid);
+        }
     } else {
         Serial.println("[WARN] NFC not available");
     }
