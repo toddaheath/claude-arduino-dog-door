@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../contexts/ToastContext';
+import GeofenceMap from '../components/GeofenceMap';
 
 const FENCE_TYPES = [
   { value: 'polygon', label: 'Polygon (Yard boundary)' },
@@ -169,6 +170,14 @@ export default function GeofenceList() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Geofence Map */}
+      {fences && fences.length > 0 && fences.some(f => f.boundaryJson !== '{}') && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <h3>Geofence Map</h3>
+          <GeofenceMap geofences={fences.filter(f => f.boundaryJson !== '{}')} />
         </div>
       )}
 

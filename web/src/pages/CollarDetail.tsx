@@ -4,6 +4,7 @@ import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationH
 import { getAnimals } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useToast } from '../contexts/ToastContext';
+import CollarMap from '../components/CollarMap';
 
 export default function CollarDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,6 +94,14 @@ export default function CollarDetail() {
         </div>
       )}
 
+      {/* Map */}
+      {(currentLoc || (history && history.length > 0)) && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h3>Location Map</h3>
+          <CollarMap currentLocation={currentLoc} history={history ?? []} />
+        </div>
+      )}
+
       <div className="grid grid-cols-2" style={{ marginBottom: '1rem' }}>
         {/* Status Card */}
         <div className="card">
@@ -134,17 +143,12 @@ export default function CollarDetail() {
         <div className="card">
           <h3>Current Location</h3>
           {currentLoc ? (
-            <div>
-              <div style={{ fontSize: '0.85rem' }}>
-                <div>Lat: {currentLoc.latitude.toFixed(6)}</div>
-                <div>Lng: {currentLoc.longitude.toFixed(6)}</div>
-                {currentLoc.accuracy && <div>Accuracy: {currentLoc.accuracy.toFixed(1)}m</div>}
-                {currentLoc.speed != null && <div>Speed: {currentLoc.speed.toFixed(1)} m/s</div>}
-                <div>Updated: {new Date(currentLoc.timestamp).toLocaleString()}</div>
-              </div>
-              <div style={{ marginTop: '0.75rem', padding: '2rem', background: 'var(--bg-muted)', borderRadius: 8, textAlign: 'center', color: 'var(--text-muted)' }}>
-                Map view requires Leaflet integration (Phase 3)
-              </div>
+            <div style={{ fontSize: '0.85rem' }}>
+              <div>Lat: {currentLoc.latitude.toFixed(6)}</div>
+              <div>Lng: {currentLoc.longitude.toFixed(6)}</div>
+              {currentLoc.accuracy && <div>Accuracy: {currentLoc.accuracy.toFixed(1)}m</div>}
+              {currentLoc.speed != null && <div>Speed: {currentLoc.speed.toFixed(1)} m/s</div>}
+              <div>Updated: {new Date(currentLoc.timestamp).toLocaleString()}</div>
             </div>
           ) : (
             <div style={{ color: 'var(--text-muted)' }}>No location data available</div>
