@@ -6,6 +6,7 @@ import { useApi } from '../hooks/useApi';
 import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../contexts/ToastContext';
+import CollarProvision from '../components/CollarProvision';
 import type { CollarPairingResult } from '../types';
 
 export default function CollarList() {
@@ -16,6 +17,7 @@ export default function CollarList() {
   const [name, setName] = useState('');
   const [animalId, setAnimalId] = useState<string>('');
   const [pairingResult, setPairingResult] = useState<CollarPairingResult | null>(null);
+  const [showProvision, setShowProvision] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +72,7 @@ export default function CollarList() {
         </button>
       </div>
 
-      {pairingResult && (
+      {pairingResult && !showProvision && (
         <div className="card" style={{ marginBottom: '1rem', border: '2px solid var(--success)' }}>
           <h3>Pairing Credentials</h3>
           <p>Flash these values to your collar firmware. <strong>The shared secret is shown only once.</strong></p>
@@ -78,10 +80,26 @@ export default function CollarList() {
             <div><strong>Collar ID:</strong> {pairingResult.collarId}</div>
             <div><strong>Shared Secret:</strong> {pairingResult.sharedSecret}</div>
           </div>
-          <button className="btn" style={{ marginTop: '0.5rem' }} onClick={() => setPairingResult(null)}>
-            Dismiss
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <button className="btn btn-primary" onClick={() => setShowProvision(true)}>
+              Setup via Bluetooth
+            </button>
+            <button className="btn" onClick={() => setPairingResult(null)}>
+              Dismiss
+            </button>
+          </div>
         </div>
+      )}
+
+      {pairingResult && showProvision && (
+        <CollarProvision
+          collarId={pairingResult.collarId}
+          sharedSecret={pairingResult.sharedSecret}
+          onComplete={() => {
+            setShowProvision(false);
+            setPairingResult(null);
+          }}
+        />
       )}
 
       {showForm && (
