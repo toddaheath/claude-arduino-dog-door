@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationHistory } from '../api/collars';
+import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationHistory, getGeofences } from '../api/collars';
 import { getAnimals } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useToast } from '../contexts/ToastContext';
@@ -16,6 +16,7 @@ export default function CollarDetail() {
   const { data: animals } = useApi(getAnimals);
   const { data: currentLoc } = useApi(() => getCurrentLocation(collarId).catch(() => null), [collarId]);
   const { data: history } = useApi(() => getLocationHistory(collarId), [collarId]);
+  const { data: geofences } = useApi(getGeofences);
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -98,7 +99,7 @@ export default function CollarDetail() {
       {(currentLoc || (history && history.length > 0)) && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h3>Location Map</h3>
-          <CollarMap currentLocation={currentLoc} history={history ?? []} />
+          <CollarMap currentLocation={currentLoc} history={history ?? []} geofences={geofences ?? []} />
         </div>
       )}
 

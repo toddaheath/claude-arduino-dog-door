@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { LocationPoint, CurrentLocation } from '../types';
+import type { LocationPoint, CurrentLocation, Geofence } from '../types';
 
 // Fix Leaflet default marker icon paths (broken by bundlers)
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
@@ -14,10 +14,13 @@ L.Icon.Default.mergeOptions({
 interface CollarMapProps {
   currentLocation?: CurrentLocation | null;
   history?: LocationPoint[];
+  geofences?: Geofence[];
   height?: number;
 }
 
-export default function CollarMap({ currentLocation, history, height = 350 }: CollarMapProps) {
+const FENCE_COLORS = { allow: '#4caf50', deny: '#ef5350' };
+
+export default function CollarMap({ currentLocation, history, geofences, height = 350 }: CollarMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
 
@@ -45,10 +48,40 @@ export default function CollarMap({ currentLocation, history, height = 350 }: Co
 
     // Clear existing layers (except tile layer)
     map.eachLayer(layer => {
-      if (layer instanceof L.Marker || layer instanceof L.Polyline || layer instanceof L.CircleMarker) {
+      if (layer instanceof L.Marker || layer instanceof L.Polyline ||
+          layer instanceof L.CircleMarker || layer instanceof L.Polygon ||
+          layer instanceof L.Circle) {
         map.removeLayer(layer);
       }
     });
+
+    // Draw geofence boundaries (under the trail)
+    if (geofences) {
+      geofences.forEach(fence => {
+        try {
+          const geo = JSON.parse(fence.boundaryJson);
+          if (!geo.type) return;
+          const c = FENCE_COLORS[fence.rule as keyof typeof FENCE_COLORS] || '#4fc3f7';
+          const opts = { color: c, fillColor: c, fillOpacity: 0.1, weight: 2, dashArray: '6 4' };
+
+          if (geo.type === 'Polygon' && geo.coordinates) {
+            const latlngs = geo.coordinates.map(([lat, lng]: number[]) => L.latLng(lat, lng));
+            L.polygon(latlngs, opts)
+              .bindPopup(`<strong>${fence.name}</strong><br/>Rule: ${fence.rule}`)
+              .addTo(map);
+          } else if (geo.type === 'Circle' && geo.center && geo.radius) {
+            L.circle(L.latLng(geo.center[0], geo.center[1]), { ...opts, radius: geo.radius })
+              .bindPopup(`<strong>${fence.name}</strong><br/>Rule: ${fence.rule}<br/>Radius: ${geo.radius}m`)
+              .addTo(map);
+          } else if (geo.type === 'Corridor' && geo.coordinates) {
+            const latlngs = geo.coordinates.map(([lat, lng]: number[]) => L.latLng(lat, lng));
+            L.polyline(latlngs, { color: c, weight: 4, opacity: 0.6, dashArray: '8 6' })
+              .bindPopup(`<strong>${fence.name}</strong><br/>Rule: ${fence.rule}`)
+              .addTo(map);
+          }
+        } catch { /* invalid boundary JSON */ }
+      });
+    }
 
     // Draw history trail
     if (history && history.length > 1) {
@@ -101,7 +134,7 @@ export default function CollarMap({ currentLocation, history, height = 350 }: Co
     if (allPoints.length > 1) {
       map.fitBounds(L.latLngBounds(allPoints), { padding: [30, 30] });
     }
-  }, [currentLocation, history]);
+  }, [currentLocation, history, geofences]);
 
   // Cleanup on unmount
   useEffect(() => {
