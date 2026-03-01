@@ -186,6 +186,60 @@ public class CollarServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UploadLocations_ComputesBatteryPercentFromVoltage()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("BatCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, 4.2f, now),
+        };
+
+        await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.NotNull(collar!.BatteryPercent);
+        Assert.InRange(collar.BatteryPercent!.Value, 99f, 100f);
+    }
+
+    [Fact]
+    public async Task UploadLocations_LowVoltage_ComputesLowPercent()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("LowBatCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        // 3.5V should be ~5% on the LiPo curve
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, 3.5f, now),
+        };
+
+        await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.NotNull(collar!.BatteryPercent);
+        Assert.True(collar.BatteryPercent!.Value >= 4f && collar.BatteryPercent.Value <= 6f);
+    }
+
+    [Fact]
+    public async Task UploadLocations_NoBattery_PercentIsNull()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("NoBatCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, null, now),
+        };
+
+        await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.Null(collar!.BatteryPercent);
+    }
+
+    [Fact]
     public async Task UploadLocations_UnknownCollar_ReturnsZero()
     {
         var count = await _service.UploadLocationsAsync("nonexistent", new[]

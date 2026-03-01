@@ -161,6 +161,7 @@ public class CollarService : ICollarService
         collar.LastLongitude = latest.Lng;
         collar.LastAccuracy = latest.Acc;
         collar.BatteryVoltage = latest.Bat;
+        collar.BatteryPercent = latest.Bat.HasValue ? VoltageToPercent(latest.Bat.Value) : null;
         collar.LastSeenAt = DateTimeOffset.FromUnixTimeSeconds(latest.Ts).UtcDateTime;
 
         await _db.SaveChangesAsync();
@@ -252,6 +253,27 @@ public class CollarService : ICollarService
             points.First().Timestamp,
             points.Last().Timestamp
         );
+    }
+
+    /// <summary>
+    /// Piecewise linear LiPo discharge curve matching firmware/collar/src/power_manager.cpp.
+    /// 4.20V=100%, 4.10V=90%, 3.95V=70%, 3.80V=40%, 3.70V=20%, 3.50V=5%, 3.20V=0%
+    /// </summary>
+    private static float VoltageToPercent(float voltage)
+    {
+        float mv = voltage * 1000f;
+        if (mv >= 4200f) return 100f;
+        if (mv <= 3200f) return 0f;
+
+        float pct;
+        if (mv > 4100f)      pct = 90f + (mv - 4100f) / (4200f - 4100f) * 10f;
+        else if (mv > 3950f) pct = 70f + (mv - 3950f) / (4100f - 3950f) * 20f;
+        else if (mv > 3800f) pct = 40f + (mv - 3800f) / (3950f - 3800f) * 30f;
+        else if (mv > 3700f) pct = 20f + (mv - 3700f) / (3800f - 3700f) * 20f;
+        else if (mv > 3500f) pct = 5f  + (mv - 3500f) / (3700f - 3500f) * 15f;
+        else                 pct = (mv - 3200f) / (3500f - 3200f) * 5f;
+
+        return Math.Clamp(pct, 0f, 100f);
     }
 
     private static double HaversineDistance(double lat1, double lon1, double lat2, double lon2)
