@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <ArduinoJson.h>
+#include <mbedtls/base64.h>
 #include "power_manager.h"
 #include "storage.h"
 #include "buzzer.h"
@@ -32,6 +33,58 @@ class CollarServerCallbacks : public NimBLEServerCallbacks {
         device_connected = false;
         Serial.println("[BLE] Client disconnected");
         NimBLEDevice::startAdvertising();
+    }
+};
+
+class ConfigCallbacks : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* pChar) override {
+        std::string raw = pChar->getValue();
+        Serial.printf("[BLE] Config write: %d bytes\n", (int)raw.size());
+
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, raw.c_str());
+        if (err) {
+            Serial.printf("[BLE] Config JSON error: %s\n", err.c_str());
+            return;
+        }
+
+        // WiFi provisioning: {"ssid":"...","pass":"...","apiKey":"..."}
+        if (doc.containsKey("ssid") && doc.containsKey("pass")) {
+            const char* ssid = doc["ssid"];
+            const char* pass = doc["pass"];
+            const char* key  = doc["apiKey"] | "";
+            storage_save_wifi_creds(ssid, pass, key);
+            Serial.printf("[BLE] WiFi configured: %s\n", ssid);
+            buzzer_play(BUZZ_SHORT);
+        }
+
+        // Collar identity provisioning: {"collarId":"...","secret":"..."}
+        if (doc.containsKey("collarId") && doc.containsKey("secret")) {
+            const char* cid = doc["collarId"];
+            const char* secret_b64 = doc["secret"];
+            // Decode base64 shared secret
+            size_t b64_len = strlen(secret_b64);
+            uint8_t secret_bytes[32] = {0};
+            // Simple base64 decode (ESP32 mbedtls)
+            size_t olen = 0;
+            mbedtls_base64_decode(secret_bytes, sizeof(secret_bytes), &olen,
+                                  (const uint8_t*)secret_b64, b64_len);
+            storage_save_collar_identity(cid, secret_bytes);
+            Serial.printf("[BLE] Collar identity set: %s\n", cid);
+            buzzer_play(BUZZ_SHORT);
+        }
+    }
+
+    void onRead(NimBLECharacteristic* pChar) override {
+        // Return current provisioning status
+        JsonDocument doc;
+        doc["collarId"] = storage_get_collar_id();
+        doc["wifiConfigured"] = (strlen(storage_get_wifi_ssid()) > 0);
+        doc["fwVersion"] = COLLAR_FW_VERSION;
+
+        String json;
+        serializeJson(doc, json);
+        pChar->setValue(json.c_str());
     }
 };
 
@@ -98,6 +151,7 @@ void ble_init() {
         NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE |
         NIMBLE_PROPERTY::READ_ENC | NIMBLE_PROPERTY::WRITE_ENC
     );
+    pConfig->setCallbacks(new ConfigCallbacks());
 
     pService->start();
     Serial.printf("[BLE] Service started: %s\n", device_name.c_str());
