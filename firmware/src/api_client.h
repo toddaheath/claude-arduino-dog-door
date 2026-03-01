@@ -16,8 +16,17 @@ struct AccessResponse {
 
 // Send camera image to API for dog identification (uses direct HTTPClient with response parsing)
 // side: "inside" or "outside" indicating which camera triggered the request
-AccessResponse api_request_access(camera_fb_t* fb, const char* side);
-AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side);
+// collarId: BLE collar ID if detected nearby (nullable)
+// collarNfcVerified: true if NFC challenge-response succeeded (nullable)
+// collarRssi: BLE signal strength of collar (nullable)
+AccessResponse api_request_access(camera_fb_t* fb, const char* side,
+                                  const char* collarId = nullptr,
+                                  int collarNfcVerified = -1,
+                                  int collarRssi = 0);
+AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side,
+                                         const char* collarId = nullptr,
+                                         int collarNfcVerified = -1,
+                                         int collarRssi = 0);
 
 // Post an approach photo to the API — logs an AnimalApproach event with the captured image.
 // Called for every motion+proximity detection regardless of TFLite result.

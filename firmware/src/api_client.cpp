@@ -24,7 +24,8 @@ static WiFiClientSecure& getSecureClient() {
     return client;
 }
 
-AccessResponse api_request_access(camera_fb_t* fb, const char* side) {
+AccessResponse api_request_access(camera_fb_t* fb, const char* side,
+                                  const char* collarId, int collarNfcVerified, int collarRssi) {
     AccessResponse response = {false, -1, "", 0.0f, "", "", false};
 
     if (!fb || !fb->buf || fb->len == 0) {
@@ -54,8 +55,23 @@ AccessResponse api_request_access(camera_fb_t* fb, const char* side) {
         sidePart += String(side);
     }
 
+    String collarPart = "";
+    if (collarId && strlen(collarId) > 0) {
+        collarPart = "\r\n--" + boundary + "\r\n";
+        collarPart += "Content-Disposition: form-data; name=\"collarId\"\r\n\r\n";
+        collarPart += String(collarId);
+        if (collarNfcVerified >= 0) {
+            collarPart += "\r\n--" + boundary + "\r\n";
+            collarPart += "Content-Disposition: form-data; name=\"collarNfcVerified\"\r\n\r\n";
+            collarPart += collarNfcVerified ? "true" : "false";
+        }
+        collarPart += "\r\n--" + boundary + "\r\n";
+        collarPart += "Content-Disposition: form-data; name=\"collarRssi\"\r\n\r\n";
+        collarPart += String(collarRssi);
+    }
+
     String bodyEnd = "\r\n--" + boundary + "--\r\n";
-    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + sidePart.length() + bodyEnd.length();
+    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + sidePart.length() + collarPart.length() + bodyEnd.length();
 
     uint8_t* body = (uint8_t*)malloc(totalLen);
     if (!body) {
@@ -68,6 +84,7 @@ AccessResponse api_request_access(camera_fb_t* fb, const char* side) {
     memcpy(body + offset, fb->buf, fb->len); offset += fb->len;
     if (apiKeyPart.length() > 0) { memcpy(body + offset, apiKeyPart.c_str(), apiKeyPart.length()); offset += apiKeyPart.length(); }
     if (sidePart.length() > 0) { memcpy(body + offset, sidePart.c_str(), sidePart.length()); offset += sidePart.length(); }
+    if (collarPart.length() > 0) { memcpy(body + offset, collarPart.c_str(), collarPart.length()); offset += collarPart.length(); }
     memcpy(body + offset, bodyEnd.c_str(), bodyEnd.length());
 
     Serial.printf("Sending access request: %d bytes\n", totalLen);
@@ -108,7 +125,8 @@ AccessResponse api_request_access(camera_fb_t* fb, const char* side) {
 }
 
 // Restore direct HTTPClient for access requests to retain response body parsing
-AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side) {
+AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side,
+                                         const char* collarId, int collarNfcVerified, int collarRssi) {
     AccessResponse response = {false, -1, "", 0.0f, "", "", false};
 
     if (!fb || !fb->buf || fb->len == 0) {
@@ -156,8 +174,23 @@ AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side) {
         sidePart += String(side);
     }
 
+    String collarPart = "";
+    if (collarId && strlen(collarId) > 0) {
+        collarPart = "\r\n--" + boundary + "\r\n";
+        collarPart += "Content-Disposition: form-data; name=\"collarId\"\r\n\r\n";
+        collarPart += String(collarId);
+        if (collarNfcVerified >= 0) {
+            collarPart += "\r\n--" + boundary + "\r\n";
+            collarPart += "Content-Disposition: form-data; name=\"collarNfcVerified\"\r\n\r\n";
+            collarPart += collarNfcVerified ? "true" : "false";
+        }
+        collarPart += "\r\n--" + boundary + "\r\n";
+        collarPart += "Content-Disposition: form-data; name=\"collarRssi\"\r\n\r\n";
+        collarPart += String(collarRssi);
+    }
+
     String bodyEnd = "\r\n--" + boundary + "--\r\n";
-    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + sidePart.length() + bodyEnd.length();
+    int totalLen = bodyStart.length() + fb->len + apiKeyPart.length() + sidePart.length() + collarPart.length() + bodyEnd.length();
 
     uint8_t* body = (uint8_t*)malloc(totalLen);
     if (!body) {
@@ -170,6 +203,7 @@ AccessResponse api_request_access_direct(camera_fb_t* fb, const char* side) {
     memcpy(body + offset, fb->buf, fb->len); offset += fb->len;
     if (apiKeyPart.length() > 0) { memcpy(body + offset, apiKeyPart.c_str(), apiKeyPart.length()); offset += apiKeyPart.length(); }
     if (sidePart.length() > 0) { memcpy(body + offset, sidePart.c_str(), sidePart.length()); offset += sidePart.length(); }
+    if (collarPart.length() > 0) { memcpy(body + offset, collarPart.c_str(), collarPart.length()); offset += collarPart.length(); }
     memcpy(body + offset, bodyEnd.c_str(), bodyEnd.length());
 
     Serial.printf("Sending access request: %d bytes\n", totalLen);

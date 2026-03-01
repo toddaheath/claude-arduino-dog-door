@@ -123,4 +123,16 @@
 #define OFFLINE_QUEUE_MAX_EVENTS 50
 #define API_FIRMWARE_EVENT_ENDPOINT "/api/v1/doors/firmware-event"
 
+// ===== Collar Detection (BLE Scanning) =====
+// The door scans for nearby collar BLE advertisements to enhance identification.
+// When a collar is detected, its ID and NFC verification status are sent with the
+// access request for fused confidence scoring.
+#define COLLAR_BLE_SCAN_ENABLED 1
+#define COLLAR_BLE_SCAN_DURATION_MS 3000
+#define COLLAR_BLE_SERVICE_UUID "5a6d0001-8b7c-4e33-9f61-2d3a4b5c6d7e"  // Collar BLE service
+#define COLLAR_RSSI_MIN -80        // Ignore collars with weaker signal
+#define COLLAR_NFC_ENABLED 0       // Set to 1 if PN532 NFC reader is wired
+#define COLLAR_NFC_SDA_PIN 21      // I2C SDA for PN532 (if enabled)
+#define COLLAR_NFC_SCL_PIN 22      // I2C SCL for PN532 (if enabled)
+
 #endif // CONFIG_H
