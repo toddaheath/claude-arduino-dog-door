@@ -6,18 +6,41 @@ import { useApi } from '../hooks/useApi';
 import { useToast } from '../contexts/ToastContext';
 import CollarMap from '../components/CollarMap';
 
+type TimeRange = '1h' | '6h' | '24h' | '7d';
+
+const TIME_RANGE_LABELS: Record<TimeRange, string> = {
+  '1h': '1 Hour',
+  '6h': '6 Hours',
+  '24h': '24 Hours',
+  '7d': '7 Days',
+};
+
+function getFromDate(range: TimeRange): string {
+  const now = new Date();
+  switch (range) {
+    case '1h': now.setHours(now.getHours() - 1); break;
+    case '6h': now.setHours(now.getHours() - 6); break;
+    case '24h': now.setHours(now.getHours() - 24); break;
+    case '7d': now.setDate(now.getDate() - 7); break;
+  }
+  return now.toISOString();
+}
+
 export default function CollarDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const collarId = Number(id);
+  const [timeRange, setTimeRange] = useState<TimeRange>('24h');
+
+  const fromDate = getFromDate(timeRange);
 
   const { data: collar, loading, error, reload } = useApi(() => getCollar(collarId), [collarId]);
   const { data: animals } = useApi(getAnimals);
   const { data: currentLoc } = useApi(() => getCurrentLocation(collarId).catch(() => null), [collarId]);
-  const { data: history } = useApi(() => getLocationHistory(collarId), [collarId]);
+  const { data: history } = useApi(() => getLocationHistory(collarId, fromDate), [collarId, timeRange]);
   const { data: geofences } = useApi(getGeofences);
-  const { data: activity } = useApi(() => getActivitySummary(collarId).catch(() => null), [collarId]);
+  const { data: activity } = useApi(() => getActivitySummary(collarId, fromDate).catch(() => null), [collarId, timeRange]);
   const { data: firmwareReleases, reload: reloadFirmware } = useApi(getFirmwareReleases);
 
   const [editing, setEditing] = useState(false);
@@ -186,9 +209,22 @@ export default function CollarDetail() {
         </div>
       </div>
 
+      {/* Time Range Selector */}
+      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.75rem' }}>
+        {(Object.keys(TIME_RANGE_LABELS) as TimeRange[]).map(range => (
+          <button
+            key={range}
+            className={`btn btn-sm${timeRange === range ? ' btn-primary' : ''}`}
+            onClick={() => setTimeRange(range)}
+          >
+            {TIME_RANGE_LABELS[range]}
+          </button>
+        ))}
+      </div>
+
       {/* Activity Summary */}
       <div className="card" style={{ marginBottom: '1rem' }}>
-        <h3>Activity (Last 24h)</h3>
+        <h3>Activity ({TIME_RANGE_LABELS[timeRange]})</h3>
         {activity ? (
           <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
             <div>
@@ -223,7 +259,7 @@ export default function CollarDetail() {
 
       {/* Location History */}
       <div className="card">
-        <h3>Location History (Last 24h)</h3>
+        <h3>Location History ({TIME_RANGE_LABELS[timeRange]})</h3>
         {history && history.length > 0 ? (
           <div style={{ maxHeight: 300, overflow: 'auto' }}>
             <table style={{ width: '100%', fontSize: '0.8rem' }}>
