@@ -13,6 +13,7 @@
 #include "network_manager.h"
 #include "power_monitor.h"
 #include "ble_server.h"
+#include "collar_detector.h"
 
 static unsigned long last_detection_time = 0;
 static unsigned long door_open_time = 0;
@@ -63,6 +64,8 @@ void setup() {
 
     network_manager_init();
     power_monitor_init();
+    collar_detector_init();
+    Serial.println("[OK] Collar detector initialized");
 
     if (network_manager_is_connected() && offline_queue_size() > 0) {
         int flushed = offline_queue_flush(API_BASE_URL, API_FIRMWARE_EVENT_ENDPOINT);
@@ -195,8 +198,26 @@ void loop() {
         return;
     }
 
-    // Stage 5: Send to API for dog identification
-    AccessResponse response = api_request_access_direct(fb, THIS_SIDE);
+    // Stage 5: Scan for nearby collar (BLE + optional NFC)
+    CollarScanResult collar = collar_detector_scan();
+    if (collar.found) {
+        Serial.printf("Collar detected: %s (RSSI: %d)\n", collar.collarId, collar.rssi);
+
+        // Attempt NFC verification if collar is very close and NFC reader is available
+        char nfcChallenge[64] = {0};
+        char nfcResponse[64] = {0};
+        if (collar.rssi > -50 && collar_nfc_read(collar.collarId, nfcChallenge, nfcResponse)) {
+            collar.nfcVerified = true;
+            Serial.println("NFC verification succeeded");
+        }
+    }
+
+    // Stage 6: Send to API for dog identification (with collar data if available)
+    AccessResponse response = api_request_access_direct(
+        fb, THIS_SIDE,
+        collar.found ? collar.collarId : nullptr,
+        collar.found ? (collar.nfcVerified ? 1 : 0) : -1,
+        collar.found ? collar.rssi : 0);
     camera_release(fb);
     last_detection_time = millis();
 
@@ -208,7 +229,7 @@ void loop() {
         return;
     }
 
-    // Stage 6: Open or deny
+    // Stage 7: Open or deny
     if (response.allowed) {
         Serial.printf("Access GRANTED for %s (confidence: %.2f, direction: %s)\n",
                       response.animalName.c_str(), response.confidenceScore,

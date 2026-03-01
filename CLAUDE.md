@@ -14,7 +14,7 @@ dotnet run
 # API runs at https://localhost:5001
 ```
 
-### Tests (80 tests, all passing)
+### Tests (156 tests, all passing)
 ```bash
 dotnet test src/DogDoor.Api.Tests
 # With coverage:
@@ -30,12 +30,20 @@ npm run build  # Production build to dist/
 npm run lint   # ESLint
 ```
 
-### Firmware (PlatformIO)
+### Firmware — Door (PlatformIO)
 ```bash
 cd firmware
 pio run              # Compile
 pio run -t upload    # Flash to ESP32-CAM
 pio test             # Run unit tests
+```
+
+### Firmware — Collar (PlatformIO)
+```bash
+cd firmware/collar
+pio run              # Compile for ESP32-S3-MINI-1
+pio run -t upload    # Flash to collar
+pio test -e native   # Run native unit tests (49 tests)
 ```
 
 ### Docker
@@ -54,12 +62,13 @@ helm uninstall dog-door                        # Remove
 ```
 
 ## Architecture
-- **firmware/**: ESP32-CAM PlatformIO project (C++)
+- **firmware/**: ESP32-CAM PlatformIO project (C++) — door controller with camera + TFLite
+- **firmware/collar/**: ESP32-S3-MINI-1 PlatformIO project (C++) — GPS collar with BLE, NFC, geofencing
 - **src/DogDoor.Api/**: ASP.NET Core Web API
-- **src/DogDoor.Api.Tests/**: xUnit test project
+- **src/DogDoor.Api.Tests/**: xUnit test project (127 tests)
 - **web/**: React + TypeScript + Vite admin SPA
 - **helm/dog-door/**: Kubernetes Helm charts
-- **docs/**: Architecture and hardware documentation
+- **docs/**: Architecture and hardware documentation (includes 21 collar design docs)
 
 ## Key Conventions
 - API uses EF Core with PostgreSQL
@@ -77,6 +86,11 @@ helm uninstall dog-door                        # Remove
 - Invitation tokens SHA-256 hashed in DB; password reset tokens BCrypt hashed with TokenPrefix for lookup
 - Firmware uses NVS encrypted storage for WiFi credentials (not LittleFS)
 - Firmware has 30s hardware watchdog (`esp_task_wdt`) — auto-reboots on hang
+- Collar NFC uses HMAC-SHA256 challenge-response; shared secret generated at registration, shown once
+- Collar firmware: state machine (BOOT → WAKE_CLASSIFY → GPS_TRACKING → NFC_READY → WIFI_UPLOAD → LOW_POWER)
+- Collar API endpoints: `/api/v1/collars` (CRUD), `/api/v1/collars/{id}/locations` (batch upload), `/api/v1/geofences` (CRUD + sync)
+- Collar location upload and geofence sync endpoints are `[AllowAnonymous]` (collar authenticates via collarId)
+- Geofences use monotonic version numbers for efficient sync; collar requests fences newer than its current version
 
 ## Testing Gotchas
 - Test project uses `Microsoft.NET.Sdk` (not Web SDK) — `AddRateLimiter()` not available; use `builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000")` in test factory

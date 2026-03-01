@@ -99,6 +99,78 @@ namespace DogDoor.Api.Migrations
                     b.ToTable("AnimalPhotos");
                 });
 
+            modelBuilder.Entity("DogDoor.Api.Models.CollarDevice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AnimalId")
+                        .HasColumnType("integer");
+
+                    b.Property<float?>("BatteryPercent")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("BatteryVoltage")
+                        .HasColumnType("real");
+
+                    b.Property<string>("CollarId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FirmwareVersion")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<float?>("LastAccuracy")
+                        .HasColumnType("real");
+
+                    b.Property<double?>("LastLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("LastLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SharedSecret")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnimalId");
+
+                    b.HasIndex("CollarId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CollarDevices");
+                });
+
             modelBuilder.Entity("DogDoor.Api.Models.DoorConfiguration", b =>
                 {
                     b.Property<int>("Id")
@@ -231,6 +303,143 @@ namespace DogDoor.Api.Migrations
                     b.ToTable("ExternalLogins");
                 });
 
+            modelBuilder.Entity("DogDoor.Api.Models.FirmwareRelease", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ReleaseNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Sha256Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Version")
+                        .IsUnique();
+
+                    b.ToTable("FirmwareReleases");
+                });
+
+            modelBuilder.Entity("DogDoor.Api.Models.Geofence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BoundaryJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("BuzzerPattern")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FenceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Rule")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Geofences");
+                });
+
+            modelBuilder.Entity("DogDoor.Api.Models.GeofenceEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("CollarDeviceId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("GeofenceId")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CollarDeviceId");
+
+                    b.HasIndex("GeofenceId");
+
+                    b.HasIndex("Timestamp");
+
+                    b.ToTable("GeofenceEvents");
+                });
+
             modelBuilder.Entity("DogDoor.Api.Models.Invitation", b =>
                 {
                     b.Property<int>("Id")
@@ -271,6 +480,58 @@ namespace DogDoor.Api.Migrations
                     b.ToTable("Invitations");
                 });
 
+            modelBuilder.Entity("DogDoor.Api.Models.LocationPoint", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<float?>("Accuracy")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("Altitude")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("BatteryVoltage")
+                        .HasColumnType("real");
+
+                    b.Property<int>("CollarDeviceId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<float?>("Heading")
+                        .HasColumnType("real");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("Satellites")
+                        .HasColumnType("integer");
+
+                    b.Property<float?>("Speed")
+                        .HasColumnType("real");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CollarDeviceId");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("CollarDeviceId", "Timestamp");
+
+                    b.ToTable("LocationPoints");
+                });
+
             modelBuilder.Entity("DogDoor.Api.Models.NotificationPreferences", b =>
                 {
                     b.Property<int>("Id")
@@ -291,6 +552,12 @@ namespace DogDoor.Api.Migrations
                     b.Property<bool>("BatteryLow")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("CollarBatteryLow")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CollarDisconnected")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("DoorClosed")
                         .HasColumnType("boolean");
 
@@ -304,6 +571,12 @@ namespace DogDoor.Api.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("EmailEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("GeofenceBreach")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("GeofenceEnteredExited")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("PowerDisconnected")
@@ -527,6 +800,24 @@ namespace DogDoor.Api.Migrations
                     b.Navigation("Animal");
                 });
 
+            modelBuilder.Entity("DogDoor.Api.Models.CollarDevice", b =>
+                {
+                    b.HasOne("DogDoor.Api.Models.Animal", "Animal")
+                        .WithMany()
+                        .HasForeignKey("AnimalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("DogDoor.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Animal");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("DogDoor.Api.Models.DoorConfiguration", b =>
                 {
                     b.HasOne("DogDoor.Api.Models.User", "User")
@@ -567,6 +858,36 @@ namespace DogDoor.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("DogDoor.Api.Models.Geofence", b =>
+                {
+                    b.HasOne("DogDoor.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("DogDoor.Api.Models.GeofenceEvent", b =>
+                {
+                    b.HasOne("DogDoor.Api.Models.CollarDevice", "CollarDevice")
+                        .WithMany("GeofenceEvents")
+                        .HasForeignKey("CollarDeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DogDoor.Api.Models.Geofence", "Geofence")
+                        .WithMany("GeofenceEvents")
+                        .HasForeignKey("GeofenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CollarDevice");
+
+                    b.Navigation("Geofence");
+                });
+
             modelBuilder.Entity("DogDoor.Api.Models.Invitation", b =>
                 {
                     b.HasOne("DogDoor.Api.Models.User", "InvitedBy")
@@ -576,6 +897,17 @@ namespace DogDoor.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("InvitedBy");
+                });
+
+            modelBuilder.Entity("DogDoor.Api.Models.LocationPoint", b =>
+                {
+                    b.HasOne("DogDoor.Api.Models.CollarDevice", "CollarDevice")
+                        .WithMany("LocationPoints")
+                        .HasForeignKey("CollarDeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CollarDevice");
                 });
 
             modelBuilder.Entity("DogDoor.Api.Models.NotificationPreferences", b =>
@@ -635,6 +967,18 @@ namespace DogDoor.Api.Migrations
                     b.Navigation("DoorEvents");
 
                     b.Navigation("Photos");
+                });
+
+            modelBuilder.Entity("DogDoor.Api.Models.CollarDevice", b =>
+                {
+                    b.Navigation("GeofenceEvents");
+
+                    b.Navigation("LocationPoints");
+                });
+
+            modelBuilder.Entity("DogDoor.Api.Models.Geofence", b =>
+                {
+                    b.Navigation("GeofenceEvents");
                 });
 
             modelBuilder.Entity("DogDoor.Api.Models.User", b =>

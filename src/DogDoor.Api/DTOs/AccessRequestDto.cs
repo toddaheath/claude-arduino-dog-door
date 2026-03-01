@@ -2,7 +2,11 @@ namespace DogDoor.Api.DTOs;
 
 public record AccessRequestDto(
     string? ApiKey,
-    string? Side
+    string? Side,
+    // Collar fields (optional, sent when collar is detected at door)
+    string? CollarId,
+    bool? CollarNfcVerified,
+    int? CollarRssi
 );
 
 public record FirmwareEventDto(

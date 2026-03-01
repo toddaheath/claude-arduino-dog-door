@@ -311,6 +311,127 @@ public class DoorServiceTests : IDisposable
         Assert.Null(logged.Direction);
     }
 
+    // ── Fused Confidence (Collar + Camera) ──────────────────
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_CollarMatchesCamera_BoostsConfidence()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(CreateConfig());
+        await _db.SaveChangesAsync();
+
+        // Register a collar assigned to the same animal
+        var collar = new CollarDevice
+        {
+            UserId = UserId,
+            AnimalId = animal.Id,
+            CollarId = "testcollar001",
+            Name = "Test Collar",
+            SharedSecret = Convert.ToBase64String(new byte[32]),
+            IsActive = true
+        };
+        _db.CollarDevices.Add(collar);
+        await _db.SaveChangesAsync();
+
+        // Camera recognizes Buddy at 0.65 (below 0.7 threshold without collar)
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
+            .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.65));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(
+            stream, null, null, "testcollar001", true, null);
+
+        // 0.65 + 0.15 = 0.80, which exceeds the 0.7 threshold
+        Assert.True(result.Allowed);
+        Assert.Equal(0.80, result.ConfidenceScore!.Value, 2);
+    }
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_CollarFallback_WhenCameraFails()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(CreateConfig());
+        await _db.SaveChangesAsync();
+
+        var collar = new CollarDevice
+        {
+            UserId = UserId,
+            AnimalId = animal.Id,
+            CollarId = "fallbackcollar01",
+            Name = "Fallback Collar",
+            SharedSecret = Convert.ToBase64String(new byte[32]),
+            IsActive = true
+        };
+        _db.CollarDevices.Add(collar);
+        await _db.SaveChangesAsync();
+
+        // Camera completely fails to identify anyone (confidence 0.1)
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
+            .ReturnsAsync(new RecognitionResult(null, null, 0.1));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(
+            stream, null, null, "fallbackcollar01", true, null);
+
+        // Collar provides animal at 0.70 confidence, which meets the threshold
+        Assert.True(result.Allowed);
+        Assert.Equal("Buddy", result.AnimalName);
+        Assert.Equal(0.70, result.ConfidenceScore!.Value, 2);
+    }
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_NoCollar_NoBoost()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(CreateConfig());
+        await _db.SaveChangesAsync();
+
+        // Camera at 0.65 (below threshold, no collar to boost)
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
+            .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.65));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(stream, null);
+
+        Assert.False(result.Allowed);
+        Assert.Equal("Animal not recognized", result.Reason);
+    }
+
+    [Fact]
+    public async Task ProcessAccessRequestAsync_CollarNfcNotVerified_NoBoost()
+    {
+        var animal = new Animal { Name = "Buddy", IsAllowed = true, UserId = UserId };
+        _db.Animals.Add(animal);
+        _db.DoorConfigurations.Add(CreateConfig());
+        await _db.SaveChangesAsync();
+
+        var collar = new CollarDevice
+        {
+            UserId = UserId,
+            AnimalId = animal.Id,
+            CollarId = "unverifiedcol01",
+            Name = "Unverified",
+            SharedSecret = Convert.ToBase64String(new byte[32]),
+            IsActive = true
+        };
+        _db.CollarDevices.Add(collar);
+        await _db.SaveChangesAsync();
+
+        // Camera at 0.65, collar present but NFC NOT verified
+        _mockRecognition.Setup(r => r.IdentifyAsync(It.IsAny<Stream>(), UserId))
+            .ReturnsAsync(new RecognitionResult(animal.Id, "Buddy", 0.65));
+
+        var stream = new MemoryStream(new byte[] { 0xFF, 0xD8 });
+        var result = await _service.ProcessAccessRequestAsync(
+            stream, null, null, "unverifiedcol01", false, null);
+
+        // No boost because NFC not verified
+        Assert.False(result.Allowed);
+    }
+
     [Fact]
     public async Task GetAccessLogsAsync_WithDirectionFilter_FiltersEvents()
     {

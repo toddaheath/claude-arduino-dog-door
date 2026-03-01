@@ -78,6 +78,8 @@ builder.Services.AddScoped<IDoorService, DoorService>();
 builder.Services.AddScoped<ISmsService, TwilioSmsService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationPreferencesService, NotificationPreferencesService>();
+builder.Services.AddScoped<ICollarService, CollarService>();
+builder.Services.AddScoped<IGeofenceService, GeofenceService>();
 
 // API Versioning
 builder.Services.AddApiVersioning(options =>

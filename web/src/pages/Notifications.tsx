@@ -20,6 +20,10 @@ const ALL_FALSE: NotificationPreferences = {
   powerRestored: false,
   batteryLow: false,
   batteryCharged: false,
+  geofenceBreach: false,
+  geofenceEnteredExited: false,
+  collarBatteryLow: false,
+  collarDisconnected: false,
 };
 
 const ALL_TRUE: NotificationPreferences = {
@@ -37,6 +41,10 @@ const ALL_TRUE: NotificationPreferences = {
   powerRestored: true,
   batteryLow: true,
   batteryCharged: true,
+  geofenceBreach: true,
+  geofenceEnteredExited: true,
+  collarBatteryLow: true,
+  collarDisconnected: true,
 };
 
 type BoolField = keyof NotificationPreferences;
@@ -83,6 +91,15 @@ const groups: { title: string; fields: { key: BoolField; label: string }[] }[] =
       { key: 'powerRestored', label: 'Main power restored' },
       { key: 'batteryLow', label: 'Battery low' },
       { key: 'batteryCharged', label: 'Battery charged' },
+    ],
+  },
+  {
+    title: 'Collar & Geofence',
+    fields: [
+      { key: 'geofenceBreach', label: 'Geofence breach (dog left boundary)' },
+      { key: 'geofenceEnteredExited', label: 'Geofence entered/exited' },
+      { key: 'collarBatteryLow', label: 'Collar battery low' },
+      { key: 'collarDisconnected', label: 'Collar disconnected' },
     ],
   },
 ];

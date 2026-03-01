@@ -19,7 +19,12 @@ public enum DoorEventType
     PowerLost = 12,
     PowerRestored = 13,
     BatteryLow = 14,
-    BatteryCharged = 15
+    BatteryCharged = 15,
+    GeofenceBreach = 20,
+    GeofenceEntered = 21,
+    GeofenceExited = 22,
+    CollarBatteryLow = 23,
+    CollarDisconnected = 24
 }
 
 public enum DoorSide

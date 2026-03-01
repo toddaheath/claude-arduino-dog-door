@@ -62,7 +62,7 @@ public class DoorsControllerTests
         var mockFile = new Mock<IFormFile>();
         mockFile.Setup(f => f.Length).Returns(0);
 
-        var result = await _controller.AccessRequest(mockFile.Object, null, null);
+        var result = await _controller.AccessRequest(mockFile.Object, null, null, null, null, null);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
@@ -77,10 +77,11 @@ public class DoorsControllerTests
         mockFile.Setup(f => f.OpenReadStream()).Returns(stream);
 
         var response = new AccessResponseDto(true, 1, "Buddy", 0.85, null, null);
-        _mockService.Setup(s => s.ProcessAccessRequestAsync(It.IsAny<Stream>(), null, null))
+        _mockService.Setup(s => s.ProcessAccessRequestAsync(
+                It.IsAny<Stream>(), null, null, null, null, null))
             .ReturnsAsync(response);
 
-        var result = await _controller.AccessRequest(mockFile.Object, null, null);
+        var result = await _controller.AccessRequest(mockFile.Object, null, null, null, null, null);
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returned = Assert.IsType<AccessResponseDto>(okResult.Value);
@@ -98,10 +99,11 @@ public class DoorsControllerTests
         mockFile.Setup(f => f.OpenReadStream()).Returns(stream);
 
         var response = new AccessResponseDto(true, 1, "Buddy", 0.85, null, "Exiting");
-        _mockService.Setup(s => s.ProcessAccessRequestAsync(It.IsAny<Stream>(), null, "inside"))
+        _mockService.Setup(s => s.ProcessAccessRequestAsync(
+                It.IsAny<Stream>(), null, "inside", null, null, null))
             .ReturnsAsync(response);
 
-        var result = await _controller.AccessRequest(mockFile.Object, null, "inside");
+        var result = await _controller.AccessRequest(mockFile.Object, null, "inside", null, null, null);
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returned = Assert.IsType<AccessResponseDto>(okResult.Value);

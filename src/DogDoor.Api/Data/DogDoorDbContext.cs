@@ -18,6 +18,11 @@ public class DogDoorDbContext : DbContext
     public DbSet<DoorConfiguration> DoorConfigurations => Set<DoorConfiguration>();
     public DbSet<NotificationPreferences> NotificationPreferences => Set<NotificationPreferences>();
     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+    public DbSet<CollarDevice> CollarDevices => Set<CollarDevice>();
+    public DbSet<LocationPoint> LocationPoints => Set<LocationPoint>();
+    public DbSet<Geofence> Geofences => Set<Geofence>();
+    public DbSet<GeofenceEvent> GeofenceEvents => Set<GeofenceEvent>();
+    public DbSet<FirmwareRelease> FirmwareReleases => Set<FirmwareRelease>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,6 +143,66 @@ public class DogDoorDbContext : DbContext
                 .WithMany(u => u.ExternalLogins)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CollarDevice>(entity =>
+        {
+            entity.HasIndex(e => e.CollarId).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Animal)
+                .WithMany()
+                .HasForeignKey(e => e.AnimalId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<LocationPoint>(entity =>
+        {
+            entity.HasIndex(e => e.CollarDeviceId);
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => new { e.CollarDeviceId, e.Timestamp });
+
+            entity.HasOne(e => e.CollarDevice)
+                .WithMany(c => c.LocationPoints)
+                .HasForeignKey(e => e.CollarDeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Geofence>(entity =>
+        {
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GeofenceEvent>(entity =>
+        {
+            entity.HasIndex(e => e.GeofenceId);
+            entity.HasIndex(e => e.CollarDeviceId);
+            entity.HasIndex(e => e.Timestamp);
+
+            entity.HasOne(e => e.Geofence)
+                .WithMany(g => g.GeofenceEvents)
+                .HasForeignKey(e => e.GeofenceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CollarDevice)
+                .WithMany(c => c.GeofenceEvents)
+                .HasForeignKey(e => e.CollarDeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FirmwareRelease>(entity =>
+        {
+            entity.HasIndex(e => e.Version).IsUnique();
         });
     }
 }

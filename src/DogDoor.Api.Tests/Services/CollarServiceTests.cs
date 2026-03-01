@@ -1,0 +1,551 @@
+using System.Security.Cryptography;
+using DogDoor.Api.Data;
+using DogDoor.Api.DTOs;
+using DogDoor.Api.Models;
+using DogDoor.Api.Services;
+using Microsoft.EntityFrameworkCore;
+
+namespace DogDoor.Api.Tests.Services;
+
+public class CollarServiceTests : IDisposable
+{
+    private readonly DogDoorDbContext _db;
+    private readonly CollarService _service;
+    private const int UserId = 50;
+
+    public CollarServiceTests()
+    {
+        var options = new DbContextOptionsBuilder<DogDoorDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        _db = new DogDoorDbContext(options);
+        _service = new CollarService(_db);
+
+        // Seed user + animal
+        _db.Users.Add(new User { Id = UserId, Email = "collar@test.com", PasswordHash = "h" });
+        _db.Animals.Add(new Animal { Id = 1, UserId = UserId, Name = "Rex", IsAllowed = true });
+        _db.SaveChanges();
+    }
+
+    public void Dispose() => _db.Dispose();
+
+    // ── Registration ─────────────────────────────────────
+
+    [Fact]
+    public async Task RegisterCollar_GeneratesUniqueIdAndSecret()
+    {
+        var result = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Collar A", null));
+
+        Assert.NotEmpty(result.CollarId);
+        Assert.Equal(16, result.CollarId.Length);
+        Assert.NotEmpty(result.SharedSecret);
+        Assert.Equal("Collar A", result.Name);
+        Assert.True(result.Id > 0);
+    }
+
+    [Fact]
+    public async Task RegisterCollar_WithAnimalId_LinksAnimal()
+    {
+        var result = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Dog Collar", 1));
+
+        var collar = await _db.CollarDevices.FindAsync(result.Id);
+        Assert.Equal(1, collar!.AnimalId);
+    }
+
+    // ── CRUD ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetCollars_ReturnsOnlyOwnedCollars()
+    {
+        await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Mine1", null));
+        await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Mine2", null));
+
+        // Create collar for different user
+        _db.Users.Add(new User { Id = 999, Email = "other@test.com", PasswordHash = "h" });
+        await _db.SaveChangesAsync();
+        await _service.RegisterCollarAsync(999, new CreateCollarDeviceDto("NotMine", null));
+
+        var collars = (await _service.GetCollarsAsync(UserId)).ToList();
+
+        Assert.Equal(2, collars.Count);
+        Assert.All(collars, c => Assert.StartsWith("Mine", c.Name));
+    }
+
+    [Fact]
+    public async Task GetCollar_ReturnsCollarForOwner()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("OwnedCollar", 1));
+
+        var result = await _service.GetCollarAsync(UserId, pairing.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal("OwnedCollar", result!.Name);
+        Assert.Equal("Rex", result.AnimalName);
+    }
+
+    [Fact]
+    public async Task GetCollar_ReturnsNullForOtherUser()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("MyCollar", null));
+
+        var result = await _service.GetCollarAsync(999, pairing.Id);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task UpdateCollar_ChangesFields()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("OldName", null));
+
+        var updated = await _service.UpdateCollarAsync(UserId, pairing.Id,
+            new UpdateCollarDeviceDto("NewName", 1, false));
+
+        Assert.NotNull(updated);
+        Assert.Equal("NewName", updated!.Name);
+        Assert.Equal(1, updated.AnimalId);
+        Assert.False(updated.IsActive);
+    }
+
+    [Fact]
+    public async Task DeleteCollar_RemovesFromDb()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("ToDelete", null));
+
+        var deleted = await _service.DeleteCollarAsync(UserId, pairing.Id);
+
+        Assert.True(deleted);
+        Assert.Null(await _db.CollarDevices.FindAsync(pairing.Id));
+    }
+
+    // ── NFC Verification ─────────────────────────────────
+
+    [Fact]
+    public async Task VerifyNfc_ValidHmac_ReturnsVerified()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("NfcCollar", 1));
+
+        var secretBytes = Convert.FromBase64String(pairing.SharedSecret);
+        var challenge = "aabbccddee112233";
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        var challengeBytes = Convert.FromHexString(challenge);
+        var timestampBytes = BitConverter.GetBytes(timestamp);
+        var payload = new byte[challengeBytes.Length + timestampBytes.Length];
+        Buffer.BlockCopy(challengeBytes, 0, payload, 0, challengeBytes.Length);
+        Buffer.BlockCopy(timestampBytes, 0, payload, challengeBytes.Length, timestampBytes.Length);
+
+        using var hmac = new HMACSHA256(secretBytes);
+        var responseHex = Convert.ToHexString(hmac.ComputeHash(payload)).ToLower();
+
+        var result = await _service.VerifyNfcAsync(pairing.CollarId,
+            new NfcVerifyRequestDto(pairing.CollarId, challenge, responseHex, timestamp));
+
+        Assert.True(result.Verified);
+        Assert.Equal(1, result.AnimalId);
+        Assert.Equal("Rex", result.AnimalName);
+        Assert.True(result.IsAllowed);
+    }
+
+    [Fact]
+    public async Task VerifyNfc_WrongHmac_Fails()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("BadNfc", null));
+
+        var result = await _service.VerifyNfcAsync(pairing.CollarId,
+            new NfcVerifyRequestDto(pairing.CollarId, "aabb", "wronghmac", DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
+
+        Assert.False(result.Verified);
+        Assert.Equal("HMAC verification failed", result.Reason);
+    }
+
+    [Fact]
+    public async Task VerifyNfc_ExpiredTimestamp_Fails()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Expired", null));
+
+        var result = await _service.VerifyNfcAsync(pairing.CollarId,
+            new NfcVerifyRequestDto(pairing.CollarId, "aabb", "ccdd",
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 60));
+
+        Assert.False(result.Verified);
+        Assert.Equal("Timestamp expired", result.Reason);
+    }
+
+    [Fact]
+    public async Task VerifyNfc_InactiveCollar_Fails()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("Inactive", null));
+
+        // Deactivate
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        collar!.IsActive = false;
+        await _db.SaveChangesAsync();
+
+        var result = await _service.VerifyNfcAsync(pairing.CollarId,
+            new NfcVerifyRequestDto(pairing.CollarId, "aabb", "ccdd", DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
+
+        Assert.False(result.Verified);
+        Assert.Equal("Collar not found", result.Reason);
+    }
+
+    // ── Location Upload ──────────────────────────────────
+
+    [Fact]
+    public async Task UploadLocations_StoresPointsAndUpdatesCollar()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("LocCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, 5.0f, null, null, null, 3.9f, now - 10),
+            new LocationPointDto(40.1, -105.1, null, 3.0f, null, null, null, 3.8f, now),
+        };
+
+        var count = await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        Assert.Equal(2, count);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.Equal(40.1, collar!.LastLatitude!.Value, 1);
+        Assert.Equal(-105.1, collar.LastLongitude!.Value, 1);
+        Assert.Equal(3.8f, collar.BatteryVoltage);
+    }
+
+    [Fact]
+    public async Task UploadLocations_ComputesBatteryPercentFromVoltage()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("BatCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, 4.2f, now),
+        };
+
+        await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.NotNull(collar!.BatteryPercent);
+        Assert.InRange(collar.BatteryPercent!.Value, 99f, 100f);
+    }
+
+    [Fact]
+    public async Task UploadLocations_LowVoltage_ComputesLowPercent()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("LowBatCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        // 3.5V should be ~5% on the LiPo curve
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, 3.5f, now),
+        };
+
+        await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.NotNull(collar!.BatteryPercent);
+        Assert.True(collar.BatteryPercent!.Value >= 4f && collar.BatteryPercent.Value <= 6f);
+    }
+
+    [Fact]
+    public async Task UploadLocations_NoBattery_PercentIsNull()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("NoBatCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var points = new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, null, now),
+        };
+
+        await _service.UploadLocationsAsync(pairing.CollarId, points);
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.Null(collar!.BatteryPercent);
+    }
+
+    [Fact]
+    public async Task UploadLocations_UnknownCollar_ReturnsZero()
+    {
+        var count = await _service.UploadLocationsAsync("nonexistent", new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, null, 0)
+        });
+
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_ReturnsLatestData()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("CurLoc", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, null, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal(42.0, loc!.Latitude, 1);
+        Assert.Equal(-106.0, loc.Longitude, 1);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_NoData_ReturnsNull()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("NoLoc", null));
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.Null(loc);
+    }
+
+    // ── Firmware Management ───────────────────────────────
+
+    [Fact]
+    public async Task CheckFirmware_NoReleases_ReturnsNotAvailable()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwCheck", null));
+
+        var result = await _service.CheckFirmwareAsync(pairing.CollarId, "1.0.0");
+
+        Assert.False(result.UpdateAvailable);
+        Assert.Null(result.LatestVersion);
+    }
+
+    [Fact]
+    public async Task CheckFirmware_NewerRelease_ReturnsAvailable()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwNew", null));
+
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "2.0.0",
+            FilePath = "/tmp/firmware_2.0.0.bin",
+            FileSize = 50000,
+            ReleaseNotes = "New features",
+            IsActive = true
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.CheckFirmwareAsync(pairing.CollarId, "1.0.0");
+
+        Assert.True(result.UpdateAvailable);
+        Assert.Equal("2.0.0", result.LatestVersion);
+        Assert.Equal(50000, result.FileSize);
+        Assert.Equal("New features", result.ReleaseNotes);
+    }
+
+    [Fact]
+    public async Task CheckFirmware_SameVersion_ReturnsNotAvailable()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwSame", null));
+
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "1.0.0",
+            FilePath = "/tmp/firmware_1.0.0.bin",
+            FileSize = 40000,
+            IsActive = true
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.CheckFirmwareAsync(pairing.CollarId, "1.0.0");
+
+        Assert.False(result.UpdateAvailable);
+    }
+
+    [Fact]
+    public async Task CheckFirmware_UpdatesCollarFirmwareVersion()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwVer", null));
+
+        await _service.CheckFirmwareAsync(pairing.CollarId, "1.5.0");
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.Equal("1.5.0", collar!.FirmwareVersion);
+    }
+
+    // ── Activity Summary ───────────────────────────────────
+
+    [Fact]
+    public async Task GetActivitySummary_WithPoints_ComputesMetrics()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("ActivityCollar", null));
+
+        var baseTime = DateTime.UtcNow.AddHours(-1);
+        for (int i = 0; i < 10; i++)
+        {
+            _db.LocationPoints.Add(new LocationPoint
+            {
+                CollarDeviceId = pairing.Id,
+                Latitude = 40.0 + (i * 0.001),
+                Longitude = -105.0,
+                Speed = 1.5f,
+                Timestamp = baseTime.AddMinutes(i * 5),
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        var summary = await _service.GetActivitySummaryAsync(UserId, pairing.Id,
+            DateTime.UtcNow.AddHours(-2), DateTime.UtcNow);
+
+        Assert.NotNull(summary);
+        Assert.Equal(10, summary!.LocationPointCount);
+        Assert.True(summary.TotalDistanceMeters > 500);
+        Assert.True(summary.ActiveMinutes > 0);
+        Assert.Equal(1.5, summary.MaxSpeedMps, 1);
+    }
+
+    [Fact]
+    public async Task GetActivitySummary_NoPoints_ReturnsZeros()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("EmptyActivity", null));
+
+        var summary = await _service.GetActivitySummaryAsync(UserId, pairing.Id,
+            DateTime.UtcNow.AddHours(-2), DateTime.UtcNow);
+
+        Assert.NotNull(summary);
+        Assert.Equal(0, summary!.LocationPointCount);
+        Assert.Equal(0, summary.TotalDistanceMeters);
+        Assert.Equal(0, summary.ActiveMinutes);
+    }
+
+    [Fact]
+    public async Task GetActivitySummary_OtherUser_ReturnsNull()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("OtherActivity", null));
+
+        var summary = await _service.GetActivitySummaryAsync(999, pairing.Id,
+            DateTime.UtcNow.AddHours(-2), DateTime.UtcNow);
+
+        Assert.Null(summary);
+    }
+
+    // ── Location History ─────────────────────────────────────
+
+    [Fact]
+    public async Task GetLocationHistory_ReturnsPointsInTimeRange()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("HistoryCollar", null));
+
+        var baseTime = DateTime.UtcNow.AddHours(-2);
+        for (int i = 0; i < 5; i++)
+        {
+            _db.LocationPoints.Add(new LocationPoint
+            {
+                CollarDeviceId = pairing.Id,
+                Latitude = 40.0 + (i * 0.001),
+                Longitude = -105.0,
+                Speed = 1.0f,
+                Timestamp = baseTime.AddMinutes(i * 10),
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        var history = (await _service.GetLocationHistoryAsync(
+            pairing.Id, baseTime.AddMinutes(-1), baseTime.AddMinutes(25))).ToList();
+
+        Assert.Equal(3, history.Count); // Minutes 0, 10, 20 are in range
+        Assert.Equal(40.0, history[0].Latitude, 2);
+        Assert.True(history[0].Timestamp < history[1].Timestamp); // Ordered by time
+    }
+
+    [Fact]
+    public async Task GetLocationHistory_EmptyRange_ReturnsEmpty()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("EmptyHistory", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, null, now),
+        });
+
+        // Query a time range that doesn't include the uploaded point
+        var farPast = DateTime.UtcNow.AddDays(-10);
+        var history = (await _service.GetLocationHistoryAsync(
+            pairing.Id, farPast, farPast.AddHours(1))).ToList();
+
+        Assert.Empty(history);
+    }
+
+    // ── Current Location ActivityState ────────────────────────
+
+    [Fact]
+    public async Task GetCurrentLocation_RunningSpeed_ReturnsRunningState()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("RunningCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, 3.0f, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal("running", loc!.ActivityState);
+        Assert.Equal(3.0f, loc.Speed);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_WalkingSpeed_ReturnsWalkingState()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("WalkingCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, 0.8f, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal("walking", loc!.ActivityState);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_StationarySpeed_ReturnsStationaryState()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("StationaryCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, 0.05f, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal("stationary", loc!.ActivityState);
+    }
+
+    [Fact]
+    public async Task GetFirmwareReleases_ReturnsAllReleases()
+    {
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "1.0.0", FilePath = "/tmp/a.bin", FileSize = 1000, IsActive = true
+        });
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "1.1.0", FilePath = "/tmp/b.bin", FileSize = 2000, IsActive = true
+        });
+        await _db.SaveChangesAsync();
+
+        var releases = (await _service.GetFirmwareReleasesAsync()).ToList();
+
+        Assert.Equal(2, releases.Count);
+    }
+}

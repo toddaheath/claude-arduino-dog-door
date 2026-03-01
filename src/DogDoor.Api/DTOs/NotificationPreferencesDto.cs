@@ -14,7 +14,11 @@ public record NotificationPreferencesDto(
     bool PowerDisconnected,
     bool PowerRestored,
     bool BatteryLow,
-    bool BatteryCharged);
+    bool BatteryCharged,
+    bool GeofenceBreach,
+    bool GeofenceEnteredExited,
+    bool CollarBatteryLow,
+    bool CollarDisconnected);
 
 public record UpdateNotificationPreferencesDto(
     bool? EmailEnabled,
@@ -30,4 +34,8 @@ public record UpdateNotificationPreferencesDto(
     bool? PowerDisconnected,
     bool? PowerRestored,
     bool? BatteryLow,
-    bool? BatteryCharged);
+    bool? BatteryCharged,
+    bool? GeofenceBreach,
+    bool? GeofenceEnteredExited,
+    bool? CollarBatteryLow,
+    bool? CollarDisconnected);

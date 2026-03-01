@@ -20,6 +20,10 @@ public class NotificationPreferences
     public bool PowerRestored { get; set; }
     public bool BatteryLow { get; set; }
     public bool BatteryCharged { get; set; }
+    public bool GeofenceBreach { get; set; } = true;
+    public bool GeofenceEnteredExited { get; set; }
+    public bool CollarBatteryLow { get; set; } = true;
+    public bool CollarDisconnected { get; set; }
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
