@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getGeofences, createGeofence, deleteGeofence, getGeofenceEvents } from '../api/collars';
+import { getGeofences, createGeofence, updateGeofence, deleteGeofence, getGeofenceEvents } from '../api/collars';
 import { useApi } from '../hooks/useApi';
 import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -36,25 +36,54 @@ export default function GeofenceList() {
   const [buzzerPattern, setBuzzerPattern] = useState(1);
   const [boundaryJson, setBoundaryJson] = useState('{}');
   const handleBoundaryChange = useCallback((json: string) => setBoundaryJson(json), []);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const startEditing = (fence: { id: number; name: string; fenceType: string; rule: string; buzzerPattern: number; boundaryJson: string }) => {
+    setEditingId(fence.id);
+    setName(fence.name);
+    setFenceType(fence.fenceType as 'polygon' | 'circle' | 'corridor');
+    setRule(fence.rule);
+    setBuzzerPattern(fence.buzzerPattern);
+    setBoundaryJson(fence.boundaryJson);
+    setShowForm(true);
+  };
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setName('');
+    setFenceType('polygon');
+    setRule('allow');
+    setBuzzerPattern(1);
+    setBoundaryJson('{}');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     try {
-      await createGeofence({
-        name: name.trim(),
-        fenceType,
-        rule,
-        boundaryJson,
-        buzzerPattern,
-      });
-      setName('');
-      setBoundaryJson('{}');
-      setShowForm(false);
+      if (editingId) {
+        await updateGeofence(editingId, {
+          name: name.trim(),
+          rule,
+          boundaryJson,
+          buzzerPattern,
+        });
+        addToast(`${name.trim()} updated`, 'success');
+      } else {
+        await createGeofence({
+          name: name.trim(),
+          fenceType,
+          rule,
+          boundaryJson,
+          buzzerPattern,
+        });
+        addToast(`${name.trim()} created`, 'success');
+      }
+      resetForm();
       reload();
-      addToast(`${name.trim()} created`, 'success');
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to create geofence', 'error');
+      addToast(err instanceof Error ? err.message : `Failed to ${editingId ? 'update' : 'create'} geofence`, 'error');
     }
   };
 
@@ -75,14 +104,14 @@ export default function GeofenceList() {
     <div>
       <div className="page-header">
         <h2 className="page-title">Virtual Geofences</h2>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+        <button className="btn btn-primary" onClick={() => { resetForm(); setShowForm(true); }}>
           + Create Geofence
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginBottom: '1rem' }}>
-          <form onSubmit={handleCreate}>
+          <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Fence Name</label>
               <input
@@ -96,7 +125,7 @@ export default function GeofenceList() {
             <div className="grid grid-cols-3">
               <div className="form-group">
                 <label>Type</label>
-                <select value={fenceType} onChange={e => setFenceType(e.target.value as 'polygon' | 'circle' | 'corridor')}>
+                <select value={fenceType} onChange={e => setFenceType(e.target.value as 'polygon' | 'circle' | 'corridor')} disabled={!!editingId}>
                   {FENCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
@@ -117,13 +146,14 @@ export default function GeofenceList() {
               <label>Draw Boundary on Map</label>
               <GeofenceEditor
                 fenceType={fenceType}
+                initialBoundary={editingId ? boundaryJson : undefined}
                 onChange={handleBoundaryChange}
                 height={350}
               />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="submit" className="btn btn-primary">Create</button>
-              <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary">{editingId ? 'Save Changes' : 'Create'}</button>
+              <button type="button" className="btn" onClick={resetForm}>Cancel</button>
             </div>
           </form>
         </div>
@@ -169,7 +199,13 @@ export default function GeofenceList() {
                 <div>Status: {fence.isActive ? 'Active' : 'Inactive'}</div>
               </div>
 
-              <div style={{ marginTop: '0.75rem' }}>
+              <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => startEditing(fence)}
+                >
+                  Edit
+                </button>
                 <button
                   className="btn btn-sm btn-danger"
                   onClick={() => handleDelete(fence.id, fence.name)}
