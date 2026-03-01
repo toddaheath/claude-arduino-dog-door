@@ -14,7 +14,7 @@ dotnet run
 # API runs at https://localhost:5001
 ```
 
-### Tests (100 tests, all passing)
+### Tests (104 tests, all passing)
 ```bash
 dotnet test src/DogDoor.Api.Tests
 # With coverage:
@@ -65,7 +65,7 @@ helm uninstall dog-door                        # Remove
 - **firmware/**: ESP32-CAM PlatformIO project (C++) — door controller with camera + TFLite
 - **firmware/collar/**: ESP32-S3-MINI-1 PlatformIO project (C++) — GPS collar with BLE, NFC, geofencing
 - **src/DogDoor.Api/**: ASP.NET Core Web API
-- **src/DogDoor.Api.Tests/**: xUnit test project (100 tests)
+- **src/DogDoor.Api.Tests/**: xUnit test project (104 tests)
 - **web/**: React + TypeScript + Vite admin SPA
 - **helm/dog-door/**: Kubernetes Helm charts
 - **docs/**: Architecture and hardware documentation (includes 21 collar design docs)
