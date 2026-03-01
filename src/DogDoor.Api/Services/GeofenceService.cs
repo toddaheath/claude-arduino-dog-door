@@ -8,10 +8,12 @@ namespace DogDoor.Api.Services;
 public class GeofenceService : IGeofenceService
 {
     private readonly DogDoorDbContext _db;
+    private readonly INotificationService _notificationService;
 
-    public GeofenceService(DogDoorDbContext db)
+    public GeofenceService(DogDoorDbContext db, INotificationService notificationService)
     {
         _db = db;
+        _notificationService = notificationService;
     }
 
     public async Task<GeofenceDto> CreateGeofenceAsync(int userId, CreateGeofenceDto dto)
@@ -119,6 +121,23 @@ public class GeofenceService : IGeofenceService
 
         _db.GeofenceEvents.AddRange(geofenceEvents);
         await _db.SaveChangesAsync();
+
+        // Notify user for breach events
+        foreach (var evt in events.Where(e => e.Type == "breach"))
+        {
+            var fence = await _db.Geofences.FindAsync(evt.FenceId);
+            var animalName = collar.AnimalId.HasValue
+                ? (await _db.Animals.FindAsync(collar.AnimalId.Value))?.Name
+                : collar.Name;
+
+            await _notificationService.NotifyAsync(
+                collar.UserId,
+                DoorEventType.GeofenceBreach,
+                animalName,
+                null,
+                fence?.Name);
+        }
+
         return geofenceEvents.Count;
     }
 
