@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Update.h>
 #include "storage.h"
 #include "power_manager.h"
 
@@ -166,11 +167,68 @@ bool wifi_check_ota_available() {
 }
 
 bool wifi_perform_ota() {
-    // Uses ESP32 built-in OTA library
-    // Download firmware binary from API and flash to OTA partition
-    // Full implementation in Phase 5 (OTA updates)
-    Serial.println("[OTA] OTA not yet implemented");
-    return false;
+    HTTPClient http;
+    String url = String(API_BASE_URL) + "/collars/" +
+                 String(storage_get_collar_id()) + "/firmware/download";
+    http.begin(url);
+    http.setTimeout(60000);  // 60s timeout for firmware download
+
+    int httpCode = http.GET();
+    if (httpCode != 200) {
+        Serial.printf("[OTA] Download failed: HTTP %d\n", httpCode);
+        http.end();
+        return false;
+    }
+
+    int contentLength = http.getSize();
+    if (contentLength <= 0) {
+        Serial.println("[OTA] Invalid content length");
+        http.end();
+        return false;
+    }
+
+    Serial.printf("[OTA] Downloading %d bytes\n", contentLength);
+
+    if (!Update.begin(contentLength)) {
+        Serial.printf("[OTA] Not enough space: %s\n", Update.errorString());
+        http.end();
+        return false;
+    }
+
+    WiFiClient* stream = http.getStreamPtr();
+    uint8_t buf[1024];
+    int written = 0;
+
+    while (http.connected() && written < contentLength) {
+        size_t available = stream->available();
+        if (available > 0) {
+            int readBytes = stream->readBytes(buf, min(available, sizeof(buf)));
+            size_t w = Update.write(buf, readBytes);
+            if (w != (size_t)readBytes) {
+                Serial.printf("[OTA] Write error at %d bytes\n", written);
+                Update.abort();
+                http.end();
+                return false;
+            }
+            written += readBytes;
+
+            // Progress every 10%
+            if (written % (contentLength / 10) < 1024) {
+                Serial.printf("[OTA] Progress: %d%%\n", written * 100 / contentLength);
+            }
+        }
+        delay(1);
+    }
+
+    http.end();
+
+    if (!Update.end(true)) {
+        Serial.printf("[OTA] Finalize failed: %s\n", Update.errorString());
+        return false;
+    }
+
+    Serial.println("[OTA] Update successful, reboot required");
+    return true;
 }
 
 #endif  // !UNIT_TEST
