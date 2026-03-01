@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -17,9 +18,11 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import GuestManagement from './pages/GuestManagement';
 import Notifications from './pages/Notifications';
-import CollarList from './pages/CollarList';
-import CollarDetail from './pages/CollarDetail';
-import GeofenceList from './pages/GeofenceList';
+
+// Lazy-load Leaflet-heavy pages to reduce initial bundle size
+const CollarList = lazy(() => import('./pages/CollarList'));
+const CollarDetail = lazy(() => import('./pages/CollarDetail'));
+const GeofenceList = lazy(() => import('./pages/GeofenceList'));
 
 const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
 const Router = isDemo ? HashRouter : BrowserRouter;
@@ -48,9 +51,9 @@ function App() {
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/profile/guests" element={<ProtectedRoute><GuestManagement /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-              <Route path="/collars" element={<ProtectedRoute><CollarList /></ProtectedRoute>} />
-              <Route path="/collars/:id" element={<ProtectedRoute><CollarDetail /></ProtectedRoute>} />
-              <Route path="/geofences" element={<ProtectedRoute><GeofenceList /></ProtectedRoute>} />
+              <Route path="/collars" element={<ProtectedRoute><Suspense fallback={<div className="skeleton" style={{ height: 300 }} />}><CollarList /></Suspense></ProtectedRoute>} />
+              <Route path="/collars/:id" element={<ProtectedRoute><Suspense fallback={<div className="skeleton" style={{ height: 300 }} />}><CollarDetail /></Suspense></ProtectedRoute>} />
+              <Route path="/geofences" element={<ProtectedRoute><Suspense fallback={<div className="skeleton" style={{ height: 300 }} />}><GeofenceList /></Suspense></ProtectedRoute>} />
             </Route>
           </Routes>
         </ToastProvider>
