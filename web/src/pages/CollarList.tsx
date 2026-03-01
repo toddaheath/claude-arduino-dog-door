@@ -49,12 +49,8 @@ export default function CollarList() {
     }
   };
 
-  const formatBattery = (pct: number | null) => {
-    if (pct == null) return '--';
-    if (pct > 50) return `${Math.round(pct)}%`;
-    if (pct > 15) return `${Math.round(pct)}%`;
-    return `${Math.round(pct)}%`;
-  };
+  const formatBattery = (pct: number | null) =>
+    pct == null ? '--' : `${Math.round(pct)}%`;
 
   const batteryColor = (pct: number | null) => {
     if (pct == null) return 'var(--text-muted)';

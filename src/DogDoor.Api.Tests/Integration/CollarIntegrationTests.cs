@@ -225,6 +225,62 @@ public class CollarIntegrationTests : IClassFixture<CustomWebAppFactory>
         Assert.Equal(42.5, current!.Latitude, 2);
     }
 
+    [Fact]
+    public async Task GetCurrentLocation_ReturnsActivityState()
+    {
+        var dto = new CreateCollarDeviceDto("ActivityStateCollar", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var batch = new LocationBatchDto(null, new[]
+        {
+            new LocationPointDto(42.5, -107.5, null, 3.0f, 2.5f, null, null, null, now)
+        });
+
+        await _client.PostAsJsonAsync($"/api/v1/collars/{pairing!.CollarId}/locations", batch);
+
+        var currentResponse = await _client.GetAsync($"/api/v1/collars/{pairing.Id}/location/current");
+        currentResponse.EnsureSuccessStatusCode();
+        var current = await currentResponse.Content.ReadFromJsonAsync<CurrentLocationDto>();
+        Assert.NotNull(current);
+        Assert.Equal("running", current!.ActivityState);
+        Assert.NotNull(current.Speed);
+    }
+
+    [Fact]
+    public async Task UploadLocations_PopulatesBatteryPercent()
+    {
+        var dto = new CreateCollarDeviceDto("BatteryPercentCollar", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var batch = new LocationBatchDto(null, new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, 4.2f, now)
+        });
+
+        await _client.PostAsJsonAsync($"/api/v1/collars/{pairing!.CollarId}/locations", batch);
+
+        var getResponse = await _client.GetAsync($"/api/v1/collars/{pairing.Id}");
+        var collar = await getResponse.Content.ReadFromJsonAsync<CollarDeviceDto>();
+        Assert.NotNull(collar!.BatteryPercent);
+        Assert.True(collar.BatteryPercent >= 99f);
+        Assert.Equal(4.2f, collar.BatteryVoltage);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_NoData_ReturnsNotFound()
+    {
+        var dto = new CreateCollarDeviceDto("NoLocCollar", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        var response = await _client.GetAsync($"/api/v1/collars/{pairing!.Id}/location/current");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ── NFC Verify ──────────────────────────────────────────
 
     [Fact]

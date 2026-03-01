@@ -400,6 +400,108 @@ public class CollarServiceTests : IDisposable
         Assert.Null(summary);
     }
 
+    // ── Location History ─────────────────────────────────────
+
+    [Fact]
+    public async Task GetLocationHistory_ReturnsPointsInTimeRange()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("HistoryCollar", null));
+
+        var baseTime = DateTime.UtcNow.AddHours(-2);
+        for (int i = 0; i < 5; i++)
+        {
+            _db.LocationPoints.Add(new LocationPoint
+            {
+                CollarDeviceId = pairing.Id,
+                Latitude = 40.0 + (i * 0.001),
+                Longitude = -105.0,
+                Speed = 1.0f,
+                Timestamp = baseTime.AddMinutes(i * 10),
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        var history = (await _service.GetLocationHistoryAsync(
+            pairing.Id, baseTime.AddMinutes(-1), baseTime.AddMinutes(25))).ToList();
+
+        Assert.Equal(3, history.Count); // Minutes 0, 10, 20 are in range
+        Assert.Equal(40.0, history[0].Latitude, 2);
+        Assert.True(history[0].Timestamp < history[1].Timestamp); // Ordered by time
+    }
+
+    [Fact]
+    public async Task GetLocationHistory_EmptyRange_ReturnsEmpty()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("EmptyHistory", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(40.0, -105.0, null, null, null, null, null, null, now),
+        });
+
+        // Query a time range that doesn't include the uploaded point
+        var farPast = DateTime.UtcNow.AddDays(-10);
+        var history = (await _service.GetLocationHistoryAsync(
+            pairing.Id, farPast, farPast.AddHours(1))).ToList();
+
+        Assert.Empty(history);
+    }
+
+    // ── Current Location ActivityState ────────────────────────
+
+    [Fact]
+    public async Task GetCurrentLocation_RunningSpeed_ReturnsRunningState()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("RunningCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, 3.0f, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal("running", loc!.ActivityState);
+        Assert.Equal(3.0f, loc.Speed);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_WalkingSpeed_ReturnsWalkingState()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("WalkingCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, 0.8f, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal("walking", loc!.ActivityState);
+    }
+
+    [Fact]
+    public async Task GetCurrentLocation_StationarySpeed_ReturnsStationaryState()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("StationaryCollar", null));
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await _service.UploadLocationsAsync(pairing.CollarId, new[]
+        {
+            new LocationPointDto(42.0, -106.0, null, 2.5f, 0.05f, null, null, null, now),
+        });
+
+        var loc = await _service.GetCurrentLocationAsync(pairing.Id);
+
+        Assert.NotNull(loc);
+        Assert.Equal("stationary", loc!.ActivityState);
+    }
+
     [Fact]
     public async Task GetFirmwareReleases_ReturnsAllReleases()
     {
