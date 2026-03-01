@@ -7,6 +7,7 @@ import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../contexts/ToastContext';
 import CollarProvision from '../components/CollarProvision';
+import CollarOverviewMap from '../components/CollarOverviewMap';
 import type { CollarPairingResult } from '../types';
 
 export default function CollarList() {
@@ -145,53 +146,63 @@ export default function CollarList() {
       )}
 
       {collars && collars.length > 0 && (
-        <div className="grid grid-cols-3">
-          {collars.map(collar => (
-            <div key={collar.id} className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <Link to={`/collars/${collar.id}`} style={{ textDecoration: 'none' }}>
-                    <h3 style={{ margin: 0 }}>{collar.name}</h3>
-                  </Link>
-                  {collar.animalName && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      {collar.animalName}
-                    </span>
-                  )}
-                </div>
-                <span style={{
-                  padding: '2px 8px',
-                  borderRadius: 12,
-                  fontSize: '0.75rem',
-                  background: collar.isActive ? 'var(--success-bg)' : 'var(--bg-muted)',
-                  color: collar.isActive ? 'var(--success)' : 'var(--text-muted)',
-                }}>
-                  {collar.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
+        <>
+          {/* Overview Map */}
+          {collars.some(c => c.lastLatitude != null) && (
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem' }}>All Collar Locations</h3>
+              <CollarOverviewMap collars={collars} />
+            </div>
+          )}
 
-              <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                <div>
-                  Battery: <span style={{ color: batteryColor(collar.batteryPercent) }}>
-                    {formatBattery(collar.batteryPercent)}
+          <div className="grid grid-cols-3">
+            {collars.map(collar => (
+              <div key={collar.id} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <Link to={`/collars/${collar.id}`} style={{ textDecoration: 'none' }}>
+                      <h3 style={{ margin: 0 }}>{collar.name}</h3>
+                    </Link>
+                    {collar.animalName && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        {collar.animalName}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    fontSize: '0.75rem',
+                    background: collar.isActive ? 'var(--success-bg)' : 'var(--bg-muted)',
+                    color: collar.isActive ? 'var(--success)' : 'var(--text-muted)',
+                  }}>
+                    {collar.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                <div>Last seen: {collar.lastSeenAt ? new Date(collar.lastSeenAt).toLocaleString() : 'Never'}</div>
-                {collar.firmwareVersion && <div>Firmware: v{collar.firmwareVersion}</div>}
-              </div>
 
-              <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-                <Link to={`/collars/${collar.id}`} className="btn btn-sm">Details</Link>
-                <button
-                  className="btn btn-sm btn-danger"
-                  onClick={() => handleDelete(collar.id, collar.name)}
-                >
-                  Delete
-                </button>
+                <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  <div>
+                    Battery: <span style={{ color: batteryColor(collar.batteryPercent) }}>
+                      {formatBattery(collar.batteryPercent)}
+                    </span>
+                  </div>
+                  <div>Last seen: {collar.lastSeenAt ? new Date(collar.lastSeenAt).toLocaleString() : 'Never'}</div>
+                  {collar.firmwareVersion && <div>Firmware: v{collar.firmwareVersion}</div>}
+                </div>
+
+                <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                  <Link to={`/collars/${collar.id}`} className="btn btn-sm">Details</Link>
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={() => handleDelete(collar.id, collar.name)}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
