@@ -157,3 +157,22 @@ public record GeofenceEventInputDto(
     double Lng,
     long Ts
 );
+
+// ── Firmware Management ────────────────────────────────────
+
+public record FirmwareReleaseDto(
+    int Id,
+    string Version,
+    long FileSize,
+    string? Sha256Hash,
+    string? ReleaseNotes,
+    bool IsActive,
+    DateTime CreatedAt
+);
+
+public record FirmwareCheckDto(
+    bool UpdateAvailable,
+    string? LatestVersion,
+    long? FileSize,
+    string? ReleaseNotes
+);

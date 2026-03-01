@@ -294,4 +294,106 @@ public class CollarIntegrationTests : IClassFixture<CustomWebAppFactory>
         var result = await response.Content.ReadFromJsonAsync<NfcVerifyResponseDto>();
         Assert.True(result!.Verified);
     }
+
+    // ── Firmware Management ──────────────────────────────────
+
+    [Fact]
+    public async Task CheckFirmware_NoRelease_ReturnsNotFound()
+    {
+        var dto = new CreateCollarDeviceDto("FwCheckCollar", null);
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/collars", dto);
+        var pairing = await createResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        var response = await _client.GetAsync(
+            $"/api/v1/collars/{pairing!.CollarId}/firmware?current=1.0.0");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadFirmware_ThenCheckAvailable()
+    {
+        // Upload firmware
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent("2.0.0"), "version");
+        content.Add(new StringContent("Bug fixes"), "releaseNotes");
+        var firmwareData = new byte[1024]; // Dummy firmware binary
+        new Random(42).NextBytes(firmwareData);
+        content.Add(new ByteArrayContent(firmwareData), "file", "collar_2.0.0.bin");
+
+        var uploadResponse = await _client.PostAsync("/api/v1/collars/firmware", content);
+        Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
+        var release = await uploadResponse.Content.ReadFromJsonAsync<FirmwareReleaseDto>();
+        Assert.NotNull(release);
+        Assert.Equal("2.0.0", release!.Version);
+        Assert.Equal(1024, release.FileSize);
+        Assert.NotNull(release.Sha256Hash);
+
+        // Register a collar
+        var collarDto = new CreateCollarDeviceDto("FwTestCollar", null);
+        var collarResponse = await _client.PostAsJsonAsync("/api/v1/collars", collarDto);
+        var pairing = await collarResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        // Check firmware — should see update available
+        var checkResponse = await _client.GetAsync(
+            $"/api/v1/collars/{pairing!.CollarId}/firmware?current=1.0.0");
+        Assert.Equal(HttpStatusCode.OK, checkResponse.StatusCode);
+        var check = await checkResponse.Content.ReadFromJsonAsync<FirmwareCheckDto>();
+        Assert.True(check!.UpdateAvailable);
+        Assert.Equal("2.0.0", check.LatestVersion);
+    }
+
+    [Fact]
+    public async Task UploadFirmware_SameVersion_CheckReturnsNotFound()
+    {
+        // Upload firmware v3.0.0
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent("3.0.0"), "version");
+        var firmwareData = new byte[512];
+        content.Add(new ByteArrayContent(firmwareData), "file", "collar_3.0.0.bin");
+        await _client.PostAsync("/api/v1/collars/firmware", content);
+
+        // Register collar
+        var collarDto = new CreateCollarDeviceDto("SameVersionCollar", null);
+        var collarResponse = await _client.PostAsJsonAsync("/api/v1/collars", collarDto);
+        var pairing = await collarResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        // Check with same version — no update
+        var checkResponse = await _client.GetAsync(
+            $"/api/v1/collars/{pairing!.CollarId}/firmware?current=3.0.0");
+        Assert.Equal(HttpStatusCode.NotFound, checkResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadFirmware_WithRelease_ReturnsFile()
+    {
+        // Upload firmware v4.0.0
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent("4.0.0"), "version");
+        var firmwareData = new byte[2048];
+        new Random(99).NextBytes(firmwareData);
+        content.Add(new ByteArrayContent(firmwareData), "file", "collar_4.0.0.bin");
+        await _client.PostAsync("/api/v1/collars/firmware", content);
+
+        // Register collar
+        var collarDto = new CreateCollarDeviceDto("DownloadCollar", null);
+        var collarResponse = await _client.PostAsJsonAsync("/api/v1/collars", collarDto);
+        var pairing = await collarResponse.Content.ReadFromJsonAsync<CollarPairingResultDto>();
+
+        // Download firmware
+        var downloadResponse = await _client.GetAsync(
+            $"/api/v1/collars/{pairing!.CollarId}/firmware/download");
+        Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
+        Assert.Equal("application/octet-stream", downloadResponse.Content.Headers.ContentType?.MediaType);
+        var downloadedBytes = await downloadResponse.Content.ReadAsByteArrayAsync();
+        Assert.Equal(2048, downloadedBytes.Length);
+    }
+
+    [Fact]
+    public async Task GetFirmwareReleases_ReturnsUploadedReleases()
+    {
+        var response = await _client.GetAsync("/api/v1/collars/firmware");
+        response.EnsureSuccessStatusCode();
+        var releases = await response.Content.ReadFromJsonAsync<FirmwareReleaseDto[]>();
+        Assert.NotNull(releases);
+    }
 }

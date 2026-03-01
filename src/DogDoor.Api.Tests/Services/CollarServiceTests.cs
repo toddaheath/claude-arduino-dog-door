@@ -223,4 +223,88 @@ public class CollarServiceTests : IDisposable
 
         Assert.Null(loc);
     }
+
+    // ── Firmware Management ───────────────────────────────
+
+    [Fact]
+    public async Task CheckFirmware_NoReleases_ReturnsNotAvailable()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwCheck", null));
+
+        var result = await _service.CheckFirmwareAsync(pairing.CollarId, "1.0.0");
+
+        Assert.False(result.UpdateAvailable);
+        Assert.Null(result.LatestVersion);
+    }
+
+    [Fact]
+    public async Task CheckFirmware_NewerRelease_ReturnsAvailable()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwNew", null));
+
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "2.0.0",
+            FilePath = "/tmp/firmware_2.0.0.bin",
+            FileSize = 50000,
+            ReleaseNotes = "New features",
+            IsActive = true
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.CheckFirmwareAsync(pairing.CollarId, "1.0.0");
+
+        Assert.True(result.UpdateAvailable);
+        Assert.Equal("2.0.0", result.LatestVersion);
+        Assert.Equal(50000, result.FileSize);
+        Assert.Equal("New features", result.ReleaseNotes);
+    }
+
+    [Fact]
+    public async Task CheckFirmware_SameVersion_ReturnsNotAvailable()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwSame", null));
+
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "1.0.0",
+            FilePath = "/tmp/firmware_1.0.0.bin",
+            FileSize = 40000,
+            IsActive = true
+        });
+        await _db.SaveChangesAsync();
+
+        var result = await _service.CheckFirmwareAsync(pairing.CollarId, "1.0.0");
+
+        Assert.False(result.UpdateAvailable);
+    }
+
+    [Fact]
+    public async Task CheckFirmware_UpdatesCollarFirmwareVersion()
+    {
+        var pairing = await _service.RegisterCollarAsync(UserId, new CreateCollarDeviceDto("FwVer", null));
+
+        await _service.CheckFirmwareAsync(pairing.CollarId, "1.5.0");
+
+        var collar = await _db.CollarDevices.FindAsync(pairing.Id);
+        Assert.Equal("1.5.0", collar!.FirmwareVersion);
+    }
+
+    [Fact]
+    public async Task GetFirmwareReleases_ReturnsAllReleases()
+    {
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "1.0.0", FilePath = "/tmp/a.bin", FileSize = 1000, IsActive = true
+        });
+        _db.FirmwareReleases.Add(new FirmwareRelease
+        {
+            Version = "1.1.0", FilePath = "/tmp/b.bin", FileSize = 2000, IsActive = true
+        });
+        await _db.SaveChangesAsync();
+
+        var releases = (await _service.GetFirmwareReleasesAsync()).ToList();
+
+        Assert.Equal(2, releases.Count);
+    }
 }

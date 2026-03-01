@@ -132,4 +132,66 @@ public class CollarsController : ControllerBase
         if (location == null) return NotFound();
         return Ok(location);
     }
+
+    // ── Firmware Management ──────────────────────────────────
+
+    /// <summary>
+    /// Check if a firmware update is available for a collar.
+    /// Called by the collar firmware.
+    /// </summary>
+    [HttpGet("{collarId}/firmware")]
+    [AllowAnonymous]
+    public async Task<ActionResult<FirmwareCheckDto>> CheckFirmware(
+        string collarId, [FromQuery] string current)
+    {
+        var check = await _collarService.CheckFirmwareAsync(collarId, current);
+        if (!check.UpdateAvailable) return NotFound();
+        return Ok(check);
+    }
+
+    /// <summary>
+    /// Download the latest firmware binary.
+    /// Called by the collar firmware during OTA.
+    /// </summary>
+    [HttpGet("{collarId}/firmware/download")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DownloadFirmware(string collarId)
+    {
+        var result = await _collarService.DownloadFirmwareAsync(collarId);
+        if (result == null) return NotFound();
+
+        var (stream, contentType, length) = result.Value;
+        if (stream == null) return NotFound();
+
+        Response.ContentLength = length;
+        return File(stream, contentType ?? "application/octet-stream", "firmware.bin");
+    }
+
+    /// <summary>
+    /// Upload a new firmware release (admin action).
+    /// </summary>
+    [HttpPost("firmware")]
+    public async Task<ActionResult<FirmwareReleaseDto>> UploadFirmware(
+        [FromForm] string version,
+        [FromForm] string? releaseNotes,
+        IFormFile file)
+    {
+        if (file.Length == 0) return BadRequest("No firmware file provided");
+
+        using var stream = file.OpenReadStream();
+        var release = await _collarService.UploadFirmwareAsync(
+            GetUserId(), version, releaseNotes, stream, file.FileName);
+
+        return CreatedAtAction(nameof(GetFirmwareReleases), release);
+    }
+
+    /// <summary>
+    /// List all firmware releases.
+    /// </summary>
+    [HttpGet("firmware")]
+    public async Task<ActionResult<IEnumerable<FirmwareReleaseDto>>> GetFirmwareReleases()
+    {
+        var releases = await _collarService.GetFirmwareReleasesAsync();
+        return Ok(releases);
+    }
 }

@@ -22,6 +22,7 @@ public class DogDoorDbContext : DbContext
     public DbSet<LocationPoint> LocationPoints => Set<LocationPoint>();
     public DbSet<Geofence> Geofences => Set<Geofence>();
     public DbSet<GeofenceEvent> GeofenceEvents => Set<GeofenceEvent>();
+    public DbSet<FirmwareRelease> FirmwareReleases => Set<FirmwareRelease>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -197,6 +198,11 @@ public class DogDoorDbContext : DbContext
                 .WithMany(c => c.GeofenceEvents)
                 .HasForeignKey(e => e.CollarDeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FirmwareRelease>(entity =>
+        {
+            entity.HasIndex(e => e.Version).IsUnique();
         });
     }
 }

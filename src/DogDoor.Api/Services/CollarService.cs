@@ -198,6 +198,89 @@ public class CollarService : ICollarService
         );
     }
 
+    public async Task<FirmwareCheckDto> CheckFirmwareAsync(string collarId, string currentVersion)
+    {
+        var collar = await _db.CollarDevices.FirstOrDefaultAsync(c => c.CollarId == collarId);
+        if (collar != null)
+        {
+            collar.FirmwareVersion = currentVersion;
+            collar.LastSeenAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
+        var latest = await _db.FirmwareReleases
+            .Where(f => f.IsActive)
+            .OrderByDescending(f => f.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (latest == null || latest.Version == currentVersion)
+            return new FirmwareCheckDto(false, null, null, null);
+
+        return new FirmwareCheckDto(true, latest.Version, latest.FileSize, latest.ReleaseNotes);
+    }
+
+    public async Task<(Stream? Stream, string? ContentType, long? Length)?> DownloadFirmwareAsync(string collarId)
+    {
+        var latest = await _db.FirmwareReleases
+            .Where(f => f.IsActive)
+            .OrderByDescending(f => f.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (latest == null || !File.Exists(latest.FilePath))
+            return null;
+
+        var stream = new FileStream(latest.FilePath, FileMode.Open, FileAccess.Read);
+        return (stream, "application/octet-stream", latest.FileSize);
+    }
+
+    public async Task<FirmwareReleaseDto> UploadFirmwareAsync(
+        int userId, string version, string? releaseNotes, Stream fileStream, string fileName)
+    {
+        var firmwareDir = Path.Combine("uploads", "firmware");
+        Directory.CreateDirectory(firmwareDir);
+        var filePath = Path.Combine(firmwareDir, $"collar_{version}.bin");
+
+        using (var fs = new FileStream(filePath, FileMode.Create))
+        {
+            await fileStream.CopyToAsync(fs);
+        }
+
+        var fileInfo = new FileInfo(filePath);
+
+        // Compute SHA-256
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        using var hashStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+        var hash = await sha256.ComputeHashAsync(hashStream);
+        var hashHex = Convert.ToHexString(hash).ToLower();
+
+        var release = new FirmwareRelease
+        {
+            Version = version,
+            FilePath = filePath,
+            FileSize = fileInfo.Length,
+            Sha256Hash = hashHex,
+            ReleaseNotes = releaseNotes,
+            IsActive = true
+        };
+
+        _db.FirmwareReleases.Add(release);
+        await _db.SaveChangesAsync();
+
+        return new FirmwareReleaseDto(
+            release.Id, release.Version, release.FileSize,
+            release.Sha256Hash, release.ReleaseNotes, release.IsActive, release.CreatedAt);
+    }
+
+    public async Task<IEnumerable<FirmwareReleaseDto>> GetFirmwareReleasesAsync()
+    {
+        return await _db.FirmwareReleases
+            .OrderByDescending(f => f.CreatedAt)
+            .Select(f => new FirmwareReleaseDto(
+                f.Id, f.Version, f.FileSize,
+                f.Sha256Hash, f.ReleaseNotes, f.IsActive, f.CreatedAt))
+            .ToListAsync();
+    }
+
     private static CollarDeviceDto ToDto(CollarDevice c)
     {
         return new CollarDeviceDto(

@@ -18,4 +18,10 @@ public interface ICollarService
     Task<int> UploadLocationsAsync(string collarId, LocationPointDto[] points);
     Task<IEnumerable<LocationQueryDto>> GetLocationHistoryAsync(int collarId, DateTime from, DateTime to);
     Task<CurrentLocationDto?> GetCurrentLocationAsync(int collarId);
+
+    // Firmware
+    Task<FirmwareCheckDto> CheckFirmwareAsync(string collarId, string currentVersion);
+    Task<(Stream? Stream, string? ContentType, long? Length)?> DownloadFirmwareAsync(string collarId);
+    Task<FirmwareReleaseDto> UploadFirmwareAsync(int userId, string version, string? releaseNotes, Stream fileStream, string fileName);
+    Task<IEnumerable<FirmwareReleaseDto>> GetFirmwareReleasesAsync();
 }
