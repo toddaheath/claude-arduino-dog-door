@@ -10,6 +10,7 @@ import type {
   CreateGeofence,
   UpdateGeofence,
   GeofenceEvent,
+  FirmwareRelease,
 } from '../types';
 import { getAccessToken } from './tokenStore';
 
@@ -77,4 +78,17 @@ export const getGeofenceEvents = (geofenceId?: number, from?: string, to?: strin
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   return api.get<GeofenceEvent[]>(`/geofences/events?${params}`).then(r => r.data);
+};
+
+// ── Firmware ───────────────────────────────────────────────
+
+export const getFirmwareReleases = () =>
+  api.get<FirmwareRelease[]>('/collars/firmware').then(r => r.data);
+
+export const uploadFirmware = (version: string, releaseNotes: string, file: File) => {
+  const form = new FormData();
+  form.append('version', version);
+  form.append('releaseNotes', releaseNotes);
+  form.append('file', file);
+  return api.post<FirmwareRelease>('/collars/firmware', form).then(r => r.data);
 };

@@ -239,3 +239,13 @@ export interface GeofenceEvent {
   longitude: number;
   timestamp: string;
 }
+
+export interface FirmwareRelease {
+  id: number;
+  version: string;
+  fileSize: number;
+  sha256Hash: string | null;
+  releaseNotes: string | null;
+  isActive: boolean;
+  createdAt: string;
+}

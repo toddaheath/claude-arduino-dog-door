@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationHistory, getGeofences } from '../api/collars';
+import { getCollar, updateCollar, deleteCollar, getCurrentLocation, getLocationHistory, getGeofences, getFirmwareReleases, uploadFirmware } from '../api/collars';
 import { getAnimals } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { useToast } from '../contexts/ToastContext';
@@ -17,10 +17,15 @@ export default function CollarDetail() {
   const { data: currentLoc } = useApi(() => getCurrentLocation(collarId).catch(() => null), [collarId]);
   const { data: history } = useApi(() => getLocationHistory(collarId), [collarId]);
   const { data: geofences } = useApi(getGeofences);
+  const { data: firmwareReleases, reload: reloadFirmware } = useApi(getFirmwareReleases);
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAnimalId, setEditAnimalId] = useState<string>('');
+  const [showFwUpload, setShowFwUpload] = useState(false);
+  const [fwVersion, setFwVersion] = useState('');
+  const [fwNotes, setFwNotes] = useState('');
+  const [fwFile, setFwFile] = useState<File | null>(null);
 
   const startEdit = () => {
     if (!collar) return;
@@ -40,6 +45,22 @@ export default function CollarDetail() {
       addToast('Collar updated', 'success');
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to update', 'error');
+    }
+  };
+
+  const handleFwUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fwVersion.trim() || !fwFile) return;
+    try {
+      await uploadFirmware(fwVersion.trim(), fwNotes.trim(), fwFile);
+      addToast(`Firmware v${fwVersion.trim()} uploaded`, 'success');
+      setShowFwUpload(false);
+      setFwVersion('');
+      setFwNotes('');
+      setFwFile(null);
+      reloadFirmware();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to upload firmware', 'error');
     }
   };
 
@@ -189,6 +210,93 @@ export default function CollarDetail() {
           </div>
         ) : (
           <div style={{ color: 'var(--text-muted)' }}>No location history available</div>
+        )}
+      </div>
+
+      {/* Firmware Management */}
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>Firmware</h3>
+          <button className="btn btn-sm" onClick={() => setShowFwUpload(!showFwUpload)}>
+            Upload New Version
+          </button>
+        </div>
+
+        {showFwUpload && (
+          <form onSubmit={handleFwUpload} style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-muted)', borderRadius: 8 }}>
+            <div className="grid grid-cols-2" style={{ gap: '0.5rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Version</label>
+                <input
+                  type="text"
+                  value={fwVersion}
+                  onChange={e => setFwVersion(e.target.value)}
+                  placeholder="e.g. 1.1.0"
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Binary (.bin)</label>
+                <input
+                  type="file"
+                  accept=".bin"
+                  onChange={e => setFwFile(e.target.files?.[0] ?? null)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="form-group" style={{ margin: '0.5rem 0 0' }}>
+              <label>Release Notes</label>
+              <input
+                type="text"
+                value={fwNotes}
+                onChange={e => setFwNotes(e.target.value)}
+                placeholder="e.g. Bug fixes and battery improvements"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button type="submit" className="btn btn-primary btn-sm">Upload</button>
+              <button type="button" className="btn btn-sm" onClick={() => setShowFwUpload(false)}>Cancel</button>
+            </div>
+          </form>
+        )}
+
+        {firmwareReleases && firmwareReleases.length > 0 ? (
+          <div style={{ maxHeight: 200, overflow: 'auto', marginTop: '0.75rem' }}>
+            <table style={{ width: '100%', fontSize: '0.8rem' }}>
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Size</th>
+                  <th>SHA-256</th>
+                  <th>Notes</th>
+                  <th>Released</th>
+                </tr>
+              </thead>
+              <tbody>
+                {firmwareReleases.map(fw => (
+                  <tr key={fw.id} style={{
+                    background: collar.firmwareVersion === fw.version ? 'var(--success-bg, rgba(76,175,80,0.1))' : undefined
+                  }}>
+                    <td style={{ fontFamily: 'monospace' }}>
+                      {fw.version}
+                      {collar.firmwareVersion === fw.version && (
+                        <span style={{ marginLeft: 4, fontSize: '0.7rem', color: 'var(--success)' }}>current</span>
+                      )}
+                    </td>
+                    <td>{(fw.fileSize / 1024).toFixed(0)} KB</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.7rem' }}>{fw.sha256Hash?.slice(0, 12)}...</td>
+                    <td>{fw.releaseNotes || '--'}</td>
+                    <td>{new Date(fw.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+            No firmware releases yet. Upload a .bin to enable OTA updates.
+          </div>
         )}
       </div>
     </div>
