@@ -27,13 +27,16 @@ public class DoorsController : ControllerBase
     public async Task<ActionResult<AccessResponseDto>> AccessRequest(
         IFormFile image,
         [FromForm] string? apiKey,
-        [FromForm] string? side)
+        [FromForm] string? side,
+        [FromForm] string? collarId = null,
+        [FromForm] bool? collarNfcVerified = null,
+        [FromForm] int? collarRssi = null)
     {
         if (image.Length == 0)
             return BadRequest("Image is required");
 
         using var stream = image.OpenReadStream();
-        var result = await _doorService.ProcessAccessRequestAsync(stream, apiKey, side);
+        var result = await _doorService.ProcessAccessRequestAsync(stream, apiKey, side, collarId, collarNfcVerified, collarRssi);
         return Ok(result);
     }
 

@@ -86,6 +86,33 @@ jobs:
       - name: Run unit tests
         run: pio test -d firmware -e native
 
+  collar-firmware:
+    name: Collar Firmware (ESP32-S3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v5
+        with:
+          path: ~/.platformio
+          key: platformio-collar-${{ hashFiles('firmware/collar/platformio.ini') }}
+          restore-keys: platformio-collar-
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Compile collar firmware
+        run: pio run -d firmware/collar -e esp32s3
+
+      - name: Run collar unit tests
+        run: pio test -d firmware/collar -e native
+
   helm:
     name: Helm Charts
     runs-on: ubuntu-latest

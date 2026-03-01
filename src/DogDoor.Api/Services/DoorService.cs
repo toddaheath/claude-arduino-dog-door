@@ -31,7 +31,7 @@ public class DoorService : IDoorService
         _notificationService = notificationService;
     }
 
-    public async Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey, string? side = null)
+    public async Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey, string? side = null, string? collarId = null, bool? collarNfcVerified = null, int? collarRssi = null)
     {
         // Determine side and direction from the requesting camera
         DoorSide? doorSide = side?.ToLowerInvariant() switch
@@ -109,9 +109,35 @@ public class DoorService : IDoorService
         using var recognitionStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read);
         var result = await _recognition.IdentifyAsync(recognitionStream, userId);
 
+        // Fused confidence: boost camera confidence when collar NFC is verified
+        var fusedConfidence = result.Confidence;
+        if (collarId != null && collarNfcVerified == true)
+        {
+            var collar = await _db.CollarDevices
+                .FirstOrDefaultAsync(c => c.CollarId == collarId && c.UserId == userId && c.IsActive);
+            if (collar?.AnimalId != null)
+            {
+                // If camera identified the same animal as the collar, boost confidence by 15%
+                if (result.AnimalId == collar.AnimalId)
+                {
+                    fusedConfidence = Math.Min(1.0, result.Confidence + 0.15);
+                }
+                // If camera didn't identify anyone but collar did, use collar's animal at 0.70 confidence
+                else if (!result.AnimalId.HasValue && result.Confidence < 0.3)
+                {
+                    var collarAnimal = await _db.Animals.FirstOrDefaultAsync(a => a.Id == collar.AnimalId && a.UserId == userId);
+                    if (collarAnimal != null)
+                    {
+                        result = new RecognitionResult(collar.AnimalId, collarAnimal.Name, 0.70);
+                        fusedConfidence = 0.70;
+                    }
+                }
+            }
+        }
+
         var threshold = doorConfig.MinConfidenceThreshold;
 
-        if (result.AnimalId.HasValue && result.Confidence >= threshold)
+        if (result.AnimalId.HasValue && fusedConfidence >= threshold)
         {
             var animal = await _db.Animals.FirstOrDefaultAsync(a => a.Id == result.AnimalId.Value && a.UserId == userId);
             if (animal is not null && animal.IsAllowed)
@@ -122,9 +148,9 @@ public class DoorService : IDoorService
                     TransitDirection.Entering => DoorEventType.EntryGranted,
                     _ => DoorEventType.AccessGranted
                 };
-                await LogEventAsync(userId, animal.Id, grantedType, imageRelativePath, result.Confidence, null, doorSide, direction);
+                await LogEventAsync(userId, animal.Id, grantedType, imageRelativePath, fusedConfidence, null, doorSide, direction);
                 await _notificationService.NotifyAsync(userId, grantedType, animal.Name, doorSide, null);
-                return new AccessResponseDto(true, animal.Id, animal.Name, result.Confidence, null, directionString);
+                return new AccessResponseDto(true, animal.Id, animal.Name, fusedConfidence, null, directionString);
             }
 
             var deniedType = direction switch
@@ -133,14 +159,14 @@ public class DoorService : IDoorService
                 TransitDirection.Entering => DoorEventType.EntryDenied,
                 _ => DoorEventType.AccessDenied
             };
-            await LogEventAsync(userId, result.AnimalId, deniedType, imageRelativePath, result.Confidence, "Animal not allowed", doorSide, direction);
+            await LogEventAsync(userId, result.AnimalId, deniedType, imageRelativePath, fusedConfidence, "Animal not allowed", doorSide, direction);
             await _notificationService.NotifyAsync(userId, deniedType, result.AnimalName, doorSide, "Animal not allowed");
-            return new AccessResponseDto(false, result.AnimalId, result.AnimalName, result.Confidence, "Animal not allowed", directionString);
+            return new AccessResponseDto(false, result.AnimalId, result.AnimalName, fusedConfidence, "Animal not allowed", directionString);
         }
 
-        await LogEventAsync(userId, null, DoorEventType.UnknownAnimal, imageRelativePath, result.Confidence, "Animal not recognized", doorSide, direction);
+        await LogEventAsync(userId, null, DoorEventType.UnknownAnimal, imageRelativePath, fusedConfidence, "Animal not recognized", doorSide, direction);
         await _notificationService.NotifyAsync(userId, DoorEventType.UnknownAnimal, null, doorSide, "Animal not recognized");
-        return new AccessResponseDto(false, null, null, result.Confidence, "Animal not recognized", directionString);
+        return new AccessResponseDto(false, null, null, fusedConfidence, "Animal not recognized", directionString);
     }
 
     public async Task<DoorConfigurationDto> GetConfigurationAsync(int userId)

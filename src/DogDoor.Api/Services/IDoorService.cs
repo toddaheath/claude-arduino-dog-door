@@ -5,7 +5,7 @@ namespace DogDoor.Api.Services;
 
 public interface IDoorService
 {
-    Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey, string? side = null);
+    Task<AccessResponseDto> ProcessAccessRequestAsync(Stream imageStream, string? apiKey, string? side = null, string? collarId = null, bool? collarNfcVerified = null, int? collarRssi = null);
     Task<DoorConfigurationDto> GetConfigurationAsync(int userId);
     Task<DoorConfigurationDto> UpdateConfigurationAsync(UpdateDoorConfigurationDto dto, int userId);
     Task<IEnumerable<DoorEventDto>> GetAccessLogsAsync(int page, int pageSize, string? eventType, string? direction, int userId);
