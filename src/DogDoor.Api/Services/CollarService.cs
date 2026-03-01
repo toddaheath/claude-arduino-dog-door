@@ -188,14 +188,29 @@ public class CollarService : ICollarService
         if (collar?.LastLatitude == null || collar.LastLongitude == null)
             return null;
 
+        // Get the latest location point for speed and activity state
+        var latestPoint = await _db.LocationPoints
+            .Where(p => p.CollarDeviceId == collarId)
+            .OrderByDescending(p => p.Timestamp)
+            .FirstOrDefaultAsync();
+
+        var speed = latestPoint?.Speed;
+        var activityState = speed switch
+        {
+            >= 2.0f => "running",
+            >= 0.5f => "walking",
+            > 0.1f => "moving",
+            _ => "stationary"
+        };
+
         return new CurrentLocationDto(
             collar.LastLatitude.Value,
             collar.LastLongitude.Value,
             collar.LastAccuracy,
-            null,
+            speed,
             collar.LastSeenAt ?? DateTime.UtcNow,
             collar.BatteryPercent,
-            null
+            activityState
         );
     }
 

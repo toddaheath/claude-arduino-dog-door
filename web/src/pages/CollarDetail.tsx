@@ -171,6 +171,13 @@ export default function CollarDetail() {
               <div>Lng: {currentLoc.longitude.toFixed(6)}</div>
               {currentLoc.accuracy && <div>Accuracy: {currentLoc.accuracy.toFixed(1)}m</div>}
               {currentLoc.speed != null && <div>Speed: {currentLoc.speed.toFixed(1)} m/s</div>}
+              {currentLoc.activityState && (
+                <div>Activity: <span style={{
+                  textTransform: 'capitalize',
+                  color: currentLoc.activityState === 'running' ? 'var(--success)' :
+                         currentLoc.activityState === 'walking' ? 'var(--warning)' : 'var(--text-muted)',
+                }}>{currentLoc.activityState}</span></div>
+              )}
               <div>Updated: {new Date(currentLoc.timestamp).toLocaleString()}</div>
             </div>
           ) : (
