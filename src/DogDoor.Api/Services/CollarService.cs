@@ -1,0 +1,210 @@
+using System.Security.Cryptography;
+using System.Text;
+using DogDoor.Api.Data;
+using DogDoor.Api.DTOs;
+using DogDoor.Api.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace DogDoor.Api.Services;
+
+public class CollarService : ICollarService
+{
+    private readonly DogDoorDbContext _db;
+
+    public CollarService(DogDoorDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task<CollarPairingResultDto> RegisterCollarAsync(int userId, CreateCollarDeviceDto dto)
+    {
+        var collarId = Guid.NewGuid().ToString("N")[..16];
+        var secretBytes = RandomNumberGenerator.GetBytes(32);
+        var secretBase64 = Convert.ToBase64String(secretBytes);
+
+        var collar = new CollarDevice
+        {
+            UserId = userId,
+            AnimalId = dto.AnimalId,
+            CollarId = collarId,
+            Name = dto.Name,
+            SharedSecret = secretBase64,
+            IsActive = true
+        };
+
+        _db.CollarDevices.Add(collar);
+        await _db.SaveChangesAsync();
+
+        return new CollarPairingResultDto(collar.Id, collarId, secretBase64, collar.Name);
+    }
+
+    public async Task<IEnumerable<CollarDeviceDto>> GetCollarsAsync(int userId)
+    {
+        return await _db.CollarDevices
+            .Where(c => c.UserId == userId)
+            .Include(c => c.Animal)
+            .Select(c => ToDto(c))
+            .ToListAsync();
+    }
+
+    public async Task<CollarDeviceDto?> GetCollarAsync(int userId, int collarId)
+    {
+        var collar = await _db.CollarDevices
+            .Include(c => c.Animal)
+            .FirstOrDefaultAsync(c => c.Id == collarId && c.UserId == userId);
+
+        return collar == null ? null : ToDto(collar);
+    }
+
+    public async Task<CollarDeviceDto?> UpdateCollarAsync(int userId, int collarId, UpdateCollarDeviceDto dto)
+    {
+        var collar = await _db.CollarDevices
+            .Include(c => c.Animal)
+            .FirstOrDefaultAsync(c => c.Id == collarId && c.UserId == userId);
+
+        if (collar == null) return null;
+
+        if (dto.Name != null) collar.Name = dto.Name;
+        if (dto.AnimalId != null) collar.AnimalId = dto.AnimalId;
+        if (dto.IsActive != null) collar.IsActive = dto.IsActive.Value;
+        collar.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return ToDto(collar);
+    }
+
+    public async Task<bool> DeleteCollarAsync(int userId, int collarId)
+    {
+        var collar = await _db.CollarDevices
+            .FirstOrDefaultAsync(c => c.Id == collarId && c.UserId == userId);
+
+        if (collar == null) return false;
+
+        _db.CollarDevices.Remove(collar);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<NfcVerifyResponseDto> VerifyNfcAsync(string collarId, NfcVerifyRequestDto dto)
+    {
+        var collar = await _db.CollarDevices
+            .Include(c => c.Animal)
+            .FirstOrDefaultAsync(c => c.CollarId == collarId && c.IsActive);
+
+        if (collar == null)
+            return new NfcVerifyResponseDto(false, null, null, null, "Collar not found");
+
+        // Validate timestamp (30-second replay window)
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (Math.Abs(now - dto.Timestamp) > 30)
+            return new NfcVerifyResponseDto(false, null, null, null, "Timestamp expired");
+
+        // Verify HMAC-SHA256
+        var secretBytes = Convert.FromBase64String(collar.SharedSecret);
+        var challengeBytes = Convert.FromHexString(dto.Challenge);
+        var timestampBytes = BitConverter.GetBytes(dto.Timestamp);
+
+        var payload = new byte[challengeBytes.Length + timestampBytes.Length];
+        Buffer.BlockCopy(challengeBytes, 0, payload, 0, challengeBytes.Length);
+        Buffer.BlockCopy(timestampBytes, 0, payload, challengeBytes.Length, timestampBytes.Length);
+
+        using var hmac = new HMACSHA256(secretBytes);
+        var expectedResponse = Convert.ToHexString(hmac.ComputeHash(payload)).ToLower();
+
+        // Constant-time comparison
+        if (!CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(expectedResponse),
+                Encoding.UTF8.GetBytes(dto.Response.ToLower())))
+        {
+            return new NfcVerifyResponseDto(false, null, null, null, "HMAC verification failed");
+        }
+
+        // Update last seen
+        collar.LastSeenAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return new NfcVerifyResponseDto(
+            true,
+            collar.AnimalId,
+            collar.Animal?.Name,
+            collar.Animal?.IsAllowed,
+            null
+        );
+    }
+
+    public async Task<int> UploadLocationsAsync(string collarId, LocationPointDto[] points)
+    {
+        var collar = await _db.CollarDevices
+            .FirstOrDefaultAsync(c => c.CollarId == collarId);
+
+        if (collar == null) return 0;
+
+        var locationPoints = points.Select(p => new LocationPoint
+        {
+            CollarDeviceId = collar.Id,
+            Latitude = p.Lat,
+            Longitude = p.Lng,
+            Altitude = p.Alt,
+            Accuracy = p.Acc,
+            Speed = p.Spd,
+            Heading = p.Hdg,
+            Satellites = p.Sat,
+            BatteryVoltage = p.Bat,
+            Timestamp = DateTimeOffset.FromUnixTimeSeconds(p.Ts).UtcDateTime
+        }).ToList();
+
+        _db.LocationPoints.AddRange(locationPoints);
+
+        // Update collar's last known position from most recent point
+        var latest = points.OrderByDescending(p => p.Ts).First();
+        collar.LastLatitude = latest.Lat;
+        collar.LastLongitude = latest.Lng;
+        collar.LastAccuracy = latest.Acc;
+        collar.BatteryVoltage = latest.Bat;
+        collar.LastSeenAt = DateTimeOffset.FromUnixTimeSeconds(latest.Ts).UtcDateTime;
+
+        await _db.SaveChangesAsync();
+        return locationPoints.Count;
+    }
+
+    public async Task<IEnumerable<LocationQueryDto>> GetLocationHistoryAsync(
+        int collarId, DateTime from, DateTime to)
+    {
+        return await _db.LocationPoints
+            .Where(p => p.CollarDeviceId == collarId && p.Timestamp >= from && p.Timestamp <= to)
+            .OrderBy(p => p.Timestamp)
+            .Select(p => new LocationQueryDto(
+                p.Latitude, p.Longitude, p.Altitude, p.Accuracy,
+                p.Speed, p.Heading, p.Satellites, p.Timestamp))
+            .ToListAsync();
+    }
+
+    public async Task<CurrentLocationDto?> GetCurrentLocationAsync(int collarId)
+    {
+        var collar = await _db.CollarDevices
+            .FirstOrDefaultAsync(c => c.Id == collarId);
+
+        if (collar?.LastLatitude == null || collar.LastLongitude == null)
+            return null;
+
+        return new CurrentLocationDto(
+            collar.LastLatitude.Value,
+            collar.LastLongitude.Value,
+            collar.LastAccuracy,
+            null,
+            collar.LastSeenAt ?? DateTime.UtcNow,
+            collar.BatteryPercent,
+            null
+        );
+    }
+
+    private static CollarDeviceDto ToDto(CollarDevice c)
+    {
+        return new CollarDeviceDto(
+            c.Id, c.CollarId, c.Name, c.AnimalId, c.Animal?.Name,
+            c.FirmwareVersion, c.BatteryPercent, c.BatteryVoltage,
+            c.LastSeenAt, c.LastLatitude, c.LastLongitude, c.LastAccuracy,
+            c.IsActive, c.CreatedAt
+        );
+    }
+}
