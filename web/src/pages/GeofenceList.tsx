@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { getGeofences, createGeofence, deleteGeofence, getGeofenceEvents } from '../api/collars';
 import { useApi } from '../hooks/useApi';
 import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../contexts/ToastContext';
 import GeofenceMap from '../components/GeofenceMap';
+import GeofenceEditor from '../components/GeofenceEditor';
 
 const FENCE_TYPES = [
   { value: 'polygon', label: 'Polygon (Yard boundary)' },
@@ -30,9 +31,11 @@ export default function GeofenceList() {
   const { addToast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
-  const [fenceType, setFenceType] = useState('polygon');
+  const [fenceType, setFenceType] = useState<'polygon' | 'circle' | 'corridor'>('polygon');
   const [rule, setRule] = useState('allow');
   const [buzzerPattern, setBuzzerPattern] = useState(1);
+  const [boundaryJson, setBoundaryJson] = useState('{}');
+  const handleBoundaryChange = useCallback((json: string) => setBoundaryJson(json), []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,10 +45,11 @@ export default function GeofenceList() {
         name: name.trim(),
         fenceType,
         rule,
-        boundaryJson: '{}',  // Placeholder — satellite map editor in Phase 4
+        boundaryJson,
         buzzerPattern,
       });
       setName('');
+      setBoundaryJson('{}');
       setShowForm(false);
       reload();
       addToast(`${name.trim()} created`, 'success');
@@ -92,7 +96,7 @@ export default function GeofenceList() {
             <div className="grid grid-cols-3">
               <div className="form-group">
                 <label>Type</label>
-                <select value={fenceType} onChange={e => setFenceType(e.target.value)}>
+                <select value={fenceType} onChange={e => setFenceType(e.target.value as 'polygon' | 'circle' | 'corridor')}>
                   {FENCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
@@ -109,9 +113,14 @@ export default function GeofenceList() {
                 </select>
               </div>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-              Boundary drawing on satellite map will be available in a future update. For now, boundaries can be configured via the API.
-            </p>
+            <div className="form-group">
+              <label>Draw Boundary on Map</label>
+              <GeofenceEditor
+                fenceType={fenceType}
+                onChange={handleBoundaryChange}
+                height={350}
+              />
+            </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="submit" className="btn btn-primary">Create</button>
               <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
