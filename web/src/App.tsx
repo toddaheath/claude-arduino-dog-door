@@ -17,6 +17,9 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import GuestManagement from './pages/GuestManagement';
 import Notifications from './pages/Notifications';
+import CollarList from './pages/CollarList';
+import CollarDetail from './pages/CollarDetail';
+import GeofenceList from './pages/GeofenceList';
 
 const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
 const Router = isDemo ? HashRouter : BrowserRouter;
@@ -45,6 +48,9 @@ function App() {
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/profile/guests" element={<ProtectedRoute><GuestManagement /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+              <Route path="/collars" element={<ProtectedRoute><CollarList /></ProtectedRoute>} />
+              <Route path="/collars/:id" element={<ProtectedRoute><CollarDetail /></ProtectedRoute>} />
+              <Route path="/geofences" element={<ProtectedRoute><GeofenceList /></ProtectedRoute>} />
             </Route>
           </Routes>
         </ToastProvider>
