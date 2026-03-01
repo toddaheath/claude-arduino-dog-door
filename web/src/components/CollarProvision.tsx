@@ -169,7 +169,7 @@ export default function CollarProvision({ collarId, sharedSecret, onComplete }: 
       {step === 'connect' && (
         <div>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
-            Power on the collar device. It will advertise as "SDDCollar-..." via Bluetooth.
+            Power on the collar device. It will advertise as &ldquo;SDDCollar-...&rdquo; via Bluetooth.
           </p>
           <button
             className="btn btn-primary"
